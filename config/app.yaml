@@ -1,0 +1,19 @@
+serial_port: "/dev/ttyUSB0"
+baud_rate: 115200
+window_width: 1920
+window_height: 1080
+fullscreen: true
+use_kms: true
+
+assets_dir: "assets"
+font_path: "assets/fonts/DejaVuSans.ttf"
+
+db_path: "data/leaderboard.db"
+video_dir: "data/videos"
+camera_duration_ms: 4000
+camera_command: "sh -c \"libcamera-vid -t {duration_ms} --codec h264 --inline -o - | gst-launch-1.0 -e fdsrc ! h264parse ! mp4mux ! filesink location='{output}'\""
+
+server_url: ""
+auth_token: ""
+sync_enabled: true
+leaderboard_size: 10
