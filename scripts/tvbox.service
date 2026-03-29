@@ -1,0 +1,24 @@
+[Unit]
+Description=TVBox Boxer GUI
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=simple
+User=erwinek
+Group=erwinek
+WorkingDirectory=/home/erwinek/tvbox
+Environment=SDL_VIDEODRIVER=kmsdrm
+Environment=SDL_RENDER_DRIVER=opengles2
+Environment=SDL_FBDEV=/dev/fb0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+ExecStart=/home/erwinek/tvbox/bin/tvbox_gui /home/erwinek/tvbox/config/app.yaml
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+SupplementaryGroups=video dialout render input
+
+[Install]
+WantedBy=multi-user.target

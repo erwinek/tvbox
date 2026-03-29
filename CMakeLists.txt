@@ -46,3 +46,24 @@ target_link_libraries(tvbox_gui PRIVATE
 target_compile_definitions(tvbox_gui PRIVATE
     SDL_MAIN_HANDLED
 )
+
+set(INSTALL_DIR "/home/erwinek/tvbox")
+
+install(TARGETS tvbox_gui DESTINATION ${INSTALL_DIR}/bin)
+install(DIRECTORY config/ DESTINATION ${INSTALL_DIR}/config)
+install(FILES scripts/tvbox.service DESTINATION /etc/systemd/system)
+
+add_custom_target(rpi5
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target tvbox_gui
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALL_DIR}/bin
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALL_DIR}/config
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALL_DIR}/data/videos
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${INSTALL_DIR}/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tvbox_gui> ${INSTALL_DIR}/bin/tvbox_gui
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/config/app.yaml ${INSTALL_DIR}/config/app.yaml
+    COMMAND sudo cp ${CMAKE_SOURCE_DIR}/scripts/tvbox.service /etc/systemd/system/tvbox.service
+    COMMAND sudo systemctl daemon-reload
+    COMMAND sudo systemctl enable tvbox.service
+    COMMENT "Deploy tvbox to RPI5 at ${INSTALL_DIR}"
+    VERBATIM
+)
