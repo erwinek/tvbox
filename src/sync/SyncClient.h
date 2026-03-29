@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace sync {
+namespace tvsync {
 
 class SyncClient {
 public:
@@ -18,4 +18,4 @@ private:
     std::string auth_token_;
 };
 
-}  // namespace sync
+}  // namespace tvsync

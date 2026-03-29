@@ -8,8 +8,8 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 pkg_check_modules(SDL2 REQUIRED sdl2)
-pkg_check_modules(SDL2_TTF REQUIRED sdl2_ttf)
-pkg_check_modules(SDL2_IMAGE REQUIRED sdl2_image)
+pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
+pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
 pkg_check_modules(SQLITE3 REQUIRED sqlite3)
 pkg_check_modules(CURL REQUIRED libcurl)
 

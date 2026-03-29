@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <string>
+#include <thread>
 
 namespace app {
 
@@ -23,6 +24,8 @@ public:
 private:
     void HandleLine(const std::string& line);
     void HandleScore(const std::string& player_id, int score, long long timestamp);
+    void HandleSpaceHit();
+    void CaptureVideoAsync(const std::string& video_path);
     void RefreshLeaderboard();
 
     config::Config cfg_;
@@ -30,10 +33,13 @@ private:
     ui::UiRenderer ui_;
     store::LeaderboardStore store_;
     media::VideoCapture video_;
-    sync::SyncClient sync_;
+    tvsync::SyncClient sync_;
 
     std::atomic<bool> running_{false};
+    std::atomic<bool> recording_{false};
     long long last_sync_ms_ = 0;
+    int demo_counter_ = 0;
+    std::thread capture_thread_;
 };
 
 }  // namespace app

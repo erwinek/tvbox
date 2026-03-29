@@ -4,7 +4,10 @@
 
 #include <SDL.h>
 
+#include "media/VideoCapture.h"
+
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <sstream>
 
@@ -30,6 +33,9 @@ App::App(const config::Config& cfg) : cfg_(cfg) {}
 
 App::~App() {
     serial_.Stop();
+    if (capture_thread_.joinable()) {
+        capture_thread_.join();
+    }
     store_.Close();
     ui_.Shutdown();
 }
@@ -71,8 +77,12 @@ void App::Run() {
             if (event.type == SDL_QUIT) {
                 running_ = false;
             }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-                running_ = false;
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    running_ = false;
+                } else if (event.key.keysym.sym == SDLK_SPACE && !event.key.repeat) {
+                    HandleSpaceHit();
+                }
             }
         }
 
@@ -85,6 +95,62 @@ void App::Run() {
         ui_.Render();
         SDL_Delay(frame_ms);
     }
+}
+
+void App::HandleSpaceHit() {
+    if (recording_) {
+        util::Log(util::LogLevel::Warn, "Already recording, ignoring space");
+        return;
+    }
+
+    demo_counter_++;
+    const long long ts = NowMs();
+    const int score = 100 + (std::rand() % 900);
+    const std::string player_id = "Player" + std::to_string(demo_counter_);
+
+    util::Log(util::LogLevel::Info, "SPACE hit -> score=" + std::to_string(score) + " player=" + player_id);
+
+    ui_.SetText("score", std::to_string(score));
+    ui_.SetScene("RESULTS");
+
+    std::string video_path;
+    if (!cfg_.camera_command.empty()) {
+        const std::string filename = "hit_" + std::to_string(ts) + ".mp4";
+        video_path = cfg_.video_dir + "/" + filename;
+        CaptureVideoAsync(video_path);
+    }
+
+    store::ScoreEntry entry{};
+    entry.player_id = player_id;
+    entry.score = score;
+    entry.timestamp = ts;
+    entry.video_path = video_path;
+    entry.synced = 0;
+    store_.AddScore(entry);
+
+    RefreshLeaderboard();
+}
+
+void App::CaptureVideoAsync(const std::string& video_path) {
+    if (capture_thread_.joinable()) {
+        capture_thread_.join();
+    }
+    recording_ = true;
+    capture_thread_ = std::thread([this, video_path]() {
+        util::Log(util::LogLevel::Info, "Recording started: " + video_path);
+        const bool ok = video_.CaptureClip(video_path, cfg_.camera_duration_ms);
+        if (ok) {
+            util::Log(util::LogLevel::Info, "Recording saved: " + video_path);
+            const std::string thumb = media::VideoCapture::ThumbPathFor(video_path);
+            media::VideoCapture::ExtractThumbnail(video_path, thumb);
+            const std::string frames_dir = media::VideoCapture::FramesDirFor(video_path);
+            media::VideoCapture::ExtractFrames(video_path, frames_dir, 10);
+            RefreshLeaderboard();
+        } else {
+            util::Log(util::LogLevel::Warn, "Recording failed: " + video_path);
+        }
+        recording_ = false;
+    });
 }
 
 void App::HandleLine(const std::string& line) {
@@ -123,7 +189,7 @@ void App::HandleScore(const std::string& player_id, int score, long long timesta
     if (!cfg_.camera_command.empty()) {
         const std::string filename = "hit_" + std::to_string(timestamp) + ".mp4";
         video_path = cfg_.video_dir + "/" + filename;
-        video_.CaptureClip(video_path, cfg_.camera_duration_ms);
+        CaptureVideoAsync(video_path);
     }
 
     store::ScoreEntry entry{};
@@ -146,6 +212,16 @@ void App::RefreshLeaderboard() {
         ue.score = e.score;
         ue.timestamp = e.timestamp;
         ue.video_path = e.video_path;
+        if (!e.video_path.empty()) {
+            ue.thumb_path = media::VideoCapture::ThumbPathFor(e.video_path);
+            if (!std::filesystem::exists(ue.thumb_path)) {
+                ue.thumb_path.clear();
+            }
+            ue.frames_dir = media::VideoCapture::FramesDirFor(e.video_path);
+            if (!std::filesystem::is_directory(ue.frames_dir)) {
+                ue.frames_dir.clear();
+            }
+        }
         ui_entries.push_back(ue);
     }
     ui_.SetLeaderboard(ui_entries);

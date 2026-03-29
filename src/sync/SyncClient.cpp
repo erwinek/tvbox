@@ -4,7 +4,7 @@
 
 #include <curl/curl.h>
 
-namespace sync {
+namespace tvsync {
 
 void SyncClient::Configure(const std::string& server_url, const std::string& auth_token) {
     server_url_ = server_url;
@@ -84,4 +84,4 @@ bool SyncClient::UploadEntry(const store::ScoreEntry& entry) {
     return true;
 }
 
-}  // namespace sync
+}  // namespace tvsync
