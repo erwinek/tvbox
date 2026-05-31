@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <vector>
 
 namespace config {
 
@@ -43,6 +44,42 @@ static bool ParseBool(const std::string& value) {
     return (v == "true" || v == "1" || v == "yes" || v == "on");
 }
 
+static std::vector<std::string> Split(const std::string& value, char sep) {
+    std::vector<std::string> parts;
+    std::stringstream ss(value);
+    std::string item;
+    while (std::getline(ss, item, sep)) {
+        parts.push_back(Trim(item));
+    }
+    return parts;
+}
+
+// Parsuje liste trybow z formatu "boxer:Boxer:1.0, kopacz:Kopacz:1.2".
+static std::vector<GameModeDef> ParseModes(const std::string& value) {
+    std::vector<GameModeDef> modes;
+    for (const auto& token : Split(value, ',')) {
+        if (token.empty()) {
+            continue;
+        }
+        auto fields = Split(token, ':');
+        if (fields.empty() || fields[0].empty()) {
+            continue;
+        }
+        GameModeDef mode;
+        mode.id = fields[0];
+        mode.name = fields.size() >= 2 && !fields[1].empty() ? fields[1] : fields[0];
+        if (fields.size() >= 3) {
+            try {
+                mode.multiplier = std::stod(fields[2]);
+            } catch (...) {
+                mode.multiplier = 1.0;
+            }
+        }
+        modes.push_back(mode);
+    }
+    return modes;
+}
+
 Config LoadConfig(const std::string& path) {
     Config cfg;
     std::ifstream file(path);
@@ -81,6 +118,17 @@ Config LoadConfig(const std::string& path) {
     if (map.count("auth_token")) cfg.auth_token = map["auth_token"];
     if (map.count("sync_enabled")) cfg.sync_enabled = ParseBool(map["sync_enabled"]);
     if (map.count("leaderboard_size")) cfg.leaderboard_size = std::stoi(map["leaderboard_size"]);
+
+    if (map.count("game_modes")) cfg.game_modes = ParseModes(map["game_modes"]);
+    if (cfg.game_modes.empty()) {
+        cfg.game_modes = {{"boxer", "BOXER", 1.0}, {"kopacz", "KOPACZ", 1.1}};
+    }
+
+    if (map.count("sound_coin")) cfg.sound_coin = map["sound_coin"];
+    if (map.count("sound_hit")) cfg.sound_hit = map["sound_hit"];
+    if (map.count("sound_select")) cfg.sound_select = map["sound_select"];
+    if (map.count("sound_win")) cfg.sound_win = map["sound_win"];
+    if (map.count("music_attract")) cfg.music_attract = map["music_attract"];
 
     return cfg;
 }

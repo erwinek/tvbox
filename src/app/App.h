@@ -1,11 +1,16 @@
 #pragma once
 
 #include "config/Config.h"
-#include "io/SerialReader.h"
+#include "core/AppContext.h"
+#include "core/InputQueue.h"
+#include "core/StateMachine.h"
+#include "game/GameSession.h"
+#include "io/SerialInput.h"
+#include "media/AudioPlayer.h"
 #include "media/VideoCapture.h"
 #include "store/LeaderboardStore.h"
 #include "sync/SyncClient.h"
-#include "ui/UiRenderer.h"
+#include "ui/Renderer.h"
 
 #include <atomic>
 #include <string>
@@ -22,23 +27,29 @@ public:
     void Run();
 
 private:
-    void HandleLine(const std::string& line);
-    void HandleScore(const std::string& player_id, int score, long long timestamp);
-    void HandleSpaceHit();
+    void RegisterScreens();
+    void CommitScore(const std::string& player_id, int score);
     void CaptureVideoAsync(const std::string& video_path);
     void RefreshLeaderboard();
 
     config::Config cfg_;
-    io::SerialReader serial_;
-    ui::UiRenderer ui_;
-    store::LeaderboardStore store_;
+
+    ui::Renderer renderer_;
+    media::AudioPlayer audio_;
     media::VideoCapture video_;
+    store::LeaderboardStore store_;
     tvsync::SyncClient sync_;
+    game::GameSession session_;
+
+    io::SerialInput serial_;
+    core::InputQueue input_queue_;
+    core::StateMachine fsm_;
+    core::AppContext ctx_;
 
     std::atomic<bool> running_{false};
     std::atomic<bool> recording_{false};
+    std::atomic<bool> leaderboard_dirty_{false};
     long long last_sync_ms_ = 0;
-    int demo_counter_ = 0;
     std::thread capture_thread_;
 };
 

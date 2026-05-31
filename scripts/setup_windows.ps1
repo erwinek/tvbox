@@ -38,6 +38,7 @@ function Install-Deps {
         "mingw-w64-x86_64-SDL2",
         "mingw-w64-x86_64-SDL2_ttf",
         "mingw-w64-x86_64-SDL2_image",
+        "mingw-w64-x86_64-SDL2_mixer",
         "mingw-w64-x86_64-sqlite3",
         "mingw-w64-x86_64-curl"
     )

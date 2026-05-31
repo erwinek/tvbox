@@ -17,3 +17,13 @@ server_url: ""
 auth_token: ""
 sync_enabled: true
 leaderboard_size: 10
+
+# Tryby gry: id:nazwa:mnoznik, oddzielone przecinkami
+game_modes: "boxer:BOXER:1.0, kopacz:KOPACZ:1.1"
+
+# Audio (opcjonalne; puste = brak dzwieku). Pliki .wav / .ogg w assets/sfx/
+sound_coin: ""
+sound_hit: ""
+sound_select: ""
+sound_win: ""
+music_attract: ""

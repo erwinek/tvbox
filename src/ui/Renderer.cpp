@@ -1,0 +1,155 @@
+#include "ui/Renderer.h"
+
+#include "util/Logger.h"
+
+#include <SDL_image.h>
+#include <SDL_ttf.h>
+
+namespace ui {
+
+Renderer::~Renderer() {
+    Shutdown();
+}
+
+bool Renderer::Init(int width, int height, bool fullscreen, const std::string& font_path) {
+    width_ = width;
+    height_ = height;
+    fullscreen_ = fullscreen;
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+        util::Log(util::LogLevel::Error, std::string("SDL init failed: ") + SDL_GetError());
+        return false;
+    }
+    if (TTF_Init() != 0) {
+        util::Log(util::LogLevel::Error, std::string("TTF init failed: ") + TTF_GetError());
+        return false;
+    }
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
+        util::Log(util::LogLevel::Warn, std::string("IMG init warning: ") + IMG_GetError());
+    }
+
+    Uint32 flags = SDL_WINDOW_SHOWN;
+    if (fullscreen_) {
+        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+
+    window_ = SDL_CreateWindow("TVBOX", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width_,
+                               height_, flags);
+    if (!window_) {
+        util::Log(util::LogLevel::Error, std::string("SDL window failed: ") + SDL_GetError());
+        return false;
+    }
+
+    renderer_ = SDL_CreateRenderer(window_, -1,
+                                   SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer_) {
+        util::Log(util::LogLevel::Error, std::string("SDL renderer failed: ") + SDL_GetError());
+        return false;
+    }
+
+    SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
+    textures_.SetRenderer(renderer_);
+
+    if (!fonts_.Load(font_path)) {
+        util::Log(util::LogLevel::Warn, "Renderer: fonts not fully loaded");
+    }
+    return true;
+}
+
+void Renderer::Shutdown() {
+    textures_.Clear();
+    fonts_.Unload();
+    if (renderer_) {
+        SDL_DestroyRenderer(renderer_);
+        renderer_ = nullptr;
+    }
+    if (window_) {
+        SDL_DestroyWindow(window_);
+        window_ = nullptr;
+    }
+    IMG_Quit();
+    TTF_Quit();
+    SDL_Quit();
+}
+
+void Renderer::BeginFrame(SDL_Color clear) {
+    SDL_SetRenderDrawColor(renderer_, clear.r, clear.g, clear.b, clear.a);
+    SDL_RenderClear(renderer_);
+}
+
+void Renderer::EndFrame() {
+    SDL_RenderPresent(renderer_);
+}
+
+void Renderer::FillRect(const SDL_Rect& rect, SDL_Color color) {
+    SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);
+    SDL_RenderFillRect(renderer_, &rect);
+}
+
+void Renderer::DrawRect(const SDL_Rect& rect, SDL_Color color) {
+    SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);
+    SDL_RenderDrawRect(renderer_, &rect);
+}
+
+void Renderer::DrawTexture(SDL_Texture* texture, const SDL_Rect& dst) {
+    if (texture) {
+        SDL_RenderCopy(renderer_, texture, nullptr, &dst);
+    }
+}
+
+SDL_Texture* Renderer::MakeTextTexture(const std::string& text, FontSize size, SDL_Color color,
+                                       int* out_w, int* out_h) {
+    TTF_Font* font = fonts_.Get(size);
+    if (!font || !renderer_) {
+        return nullptr;
+    }
+    SDL_Surface* surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
+    if (!surface) {
+        return nullptr;
+    }
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
+    if (out_w) *out_w = surface->w;
+    if (out_h) *out_h = surface->h;
+    SDL_FreeSurface(surface);
+    return texture;
+}
+
+SDL_Rect Renderer::DrawText(const std::string& text, FontSize size, SDL_Color color, int x, int y,
+                            bool center_x, Uint8 alpha, float scale) {
+    SDL_Rect dst{x, y, 0, 0};
+    int w = 0, h = 0;
+    SDL_Texture* tex = MakeTextTexture(text, size, color, &w, &h);
+    if (!tex) {
+        return dst;
+    }
+    const int sw = static_cast<int>(w * scale);
+    const int sh = static_cast<int>(h * scale);
+    dst.x = center_x ? x - sw / 2 : x;
+    dst.y = y;
+    dst.w = sw;
+    dst.h = sh;
+    if (alpha != 255) {
+        SDL_SetTextureAlphaMod(tex, alpha);
+    }
+    SDL_RenderCopy(renderer_, tex, nullptr, &dst);
+    SDL_DestroyTexture(tex);
+    return dst;
+}
+
+void Renderer::DrawImage(const std::string& path, const SDL_Rect& dst) {
+    SDL_Texture* tex = textures_.Get(path);
+    if (tex) {
+        SDL_RenderCopy(renderer_, tex, nullptr, &dst);
+    }
+}
+
+SDL_Point Renderer::MeasureText(const std::string& text, FontSize size) {
+    SDL_Point out{0, 0};
+    TTF_Font* font = fonts_.Get(size);
+    if (font) {
+        TTF_SizeUTF8(font, text.c_str(), &out.x, &out.y);
+    }
+    return out;
+}
+
+}  // namespace ui

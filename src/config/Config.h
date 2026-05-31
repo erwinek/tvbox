@@ -1,8 +1,15 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace config {
+
+struct GameModeDef {
+    std::string id;
+    std::string name;
+    double multiplier = 1.0;
+};
 
 struct Config {
     std::string serial_port = "/dev/ttyUSB0";
@@ -24,6 +31,16 @@ struct Config {
     std::string auth_token;
     bool sync_enabled = true;
     int leaderboard_size = 10;
+
+    // Tryby gry (data-driven). Domyslnie Boxer + Kopacz gdy brak w configu.
+    std::vector<GameModeDef> game_modes;
+
+    // Audio (opcjonalne sciezki; puste = brak dzwieku).
+    std::string sound_coin;
+    std::string sound_hit;
+    std::string sound_select;
+    std::string sound_win;
+    std::string music_attract;
 };
 
 Config LoadConfig(const std::string& path);

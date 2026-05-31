@@ -2,8 +2,38 @@
 
 GUI dla silomierza boxer na RPI4/5. SDL2, UART z ESP32, lokalny ranking offline, zapis wideo uderzenia i synchronizacja z serwerem.
 
+## Architektura
+
+Aplikacja jest maszyna stanow (FSM). Kazdy stan to osobny ekran (`Screen`):
+
+```
+CHOINKA (Attract) --kredyt--> GAME_START (ModeSelect) --start--> MEASURE --wynik--> END_GAME
+   ^                                                                                   |
+   +------------------------------ brak kredytow / timeout ----------------------------+
+```
+
+Podzial modulow w `src/`:
+- `core/` — `StateMachine`, `Screen` (interfejs), `GameState`, `Events` (InputEvent), `AppContext`, `InputQueue`, `Clock`.
+- `screens/` — `AttractScreen` (CHOINKA), `ModeSelectScreen` (GAME_START), `MeasureScreen`, `EndGameScreen`.
+- `game/` — `GameSession`, `GameMode` (data-driven z configu), `Credits`, `ScoreEngine`.
+- `io/` — `InputQueue`, `KeyboardInput`, `SerialInput` + `Protocol` (UART), `SerialReader` (low-level).
+- `ui/` — `Renderer` (wrapper SDL), `FontManager`, `TextureCache`, `FrameSequencePlayer`, `widgets/` (Header, ScrollBar, LeaderboardWidget).
+- `media/` — `VideoCapture` (nagrywanie ffmpeg), `AudioPlayer` (SDL2_mixer).
+- `store/`, `sync/`, `config/`, `util/` — baza, synchronizacja, konfiguracja, logi.
+
+Dodanie nowego stanu = nowa klasa w `screens/` + rejestracja w `App::RegisterScreens`.
+
+### Sterowanie (tryb dev / klawiatura)
+- `C` — wrzucenie kredytu (Coin)
+- strzalki `<- ->` — wybor trybu gry
+- `ENTER` — start / zatwierdzenie
+- `SPACE` — symulacja uderzenia (w stanie MEASURE)
+- `BACKSPACE` — cofnij
+- `ESC` — wyjscie
+- `1` / `2` / `3` / `4` — symulacja UART: skok do stanu CHOINKA / GAME_START / MEASURE / END_GAME
+
 ## Wymagania (Raspberry Pi OS)
-- SDL2, SDL2_ttf, SDL2_image
+- SDL2, SDL2_ttf, SDL2_image, SDL2_mixer
 - SQLite3
 - libcurl
 - libcamera + GStreamer
@@ -12,7 +42,7 @@ Przykład instalacji:
 ```
 sudo apt-get update
 sudo apt-get install -y build-essential cmake pkg-config \
-  libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev \
+  libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev libsdl2-mixer-dev \
   libsqlite3-dev libcurl4-openssl-dev \
   libcamera-apps gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good
 ```
@@ -63,15 +93,19 @@ SDL_VIDEODRIVER=kmsdrm SDL_RENDER_DRIVER=opengles2 SDL_FBDEV=/dev/fb0 \
 Na RPI warto dodać użytkownika do grup `video` i `dialout`, a także upewnić się, że konsola ma dostęp do `/dev/dri` i `/dev/ttyUSB*`.
 
 ## Protokół UART (ESP32 -> RPI)
-- Wynik: `SCORE,<value>,<playerId>,<unix_ms>`
-- Stan: `STATE,IDLE` / `STATE,READY` / `STATE,HIT`
-- UI: `UI,SCENE,<name>` / `UI,TEXT,<id>,<value>` / `UI,IMAGE,<id>,<assetKey>`
+- Kredyt: `COIN` lub `CREDIT`
+- Wynik (uderzenie): `SCORE,<value>,<playerId>,<unix_ms>`
+- Stan: `STATE,HIT` (symulacja uderzenia)
+
+Linie sa parsowane w `[src/io/Protocol.cpp](src/io/Protocol.cpp)` na zdarzenia `InputEvent`.
 
 ## Konfiguracja
-Ustawienia w `config/app.yaml`:
+Ustawienia w `config/app.yaml` (RPI) i `config/app-windows.yaml` (dev):
 - `serial_port`, `baud_rate`
-- `camera_command` (libcamera + GStreamer, z `{duration_ms}` i `{output}`)
+- `camera_command` (ffmpeg/libcamera, z `{duration_ms}` i `{output}`)
 - `server_url`, `auth_token` (dla sync)
+- `game_modes` — lista trybow `id:nazwa:mnoznik`, np. `"boxer:BOXER:1.0, kopacz:KOPACZ:1.1"`
+- `sound_coin`, `sound_hit`, `sound_select`, `sound_win`, `music_attract` — opcjonalne audio (puste = cisza)
 
 ## Deployment na RPI5
 
