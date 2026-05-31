@@ -1,0 +1,20 @@
+# Build
+/build/
+/build-mingw/
+/out/
+/vcpkg_installed/
+
+# Runtime data (generowane w trakcie pracy aplikacji)
+/data/leaderboard.db
+/data/videos/**
+!/data/videos/.gitkeep
+
+# IDE / OS
+.vs/
+.vscode/
+*.user
+.DS_Store
+Thumbs.db
+
+# Logi
+*.log
