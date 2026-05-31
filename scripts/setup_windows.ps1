@@ -14,6 +14,31 @@ function Ensure-Msys2 {
     return $MsysRoot
 }
 
+function Ensure-Ffmpeg {
+    if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+        $src = (Get-Command ffmpeg).Source
+        Write-Host "ffmpeg juz dostepny: $src"
+        return
+    }
+
+    Write-Host "Instalacja ffmpeg (winget, wymagane do nagrywania z kamerki)..."
+    winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements
+
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+    if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+        Write-Host "ffmpeg zainstalowany: $((Get-Command ffmpeg).Source)"
+        Write-Host ""
+        & (Join-Path $PSScriptRoot "detect_camera.ps1")
+        return
+    }
+
+    Write-Warning "ffmpeg moze byc zainstalowany, ale nie widoczny w PATH tej sesji."
+    Write-Warning "Zamknij terminal, otworz nowy i sprawdz: ffmpeg -version"
+    Write-Warning "Liste kamer: ffmpeg -list_devices true -f dshow -i dummy"
+}
+
 function Ensure-Font {
     $FontDir = Join-Path $Root "assets\fonts"
     $FontPath = Join-Path $FontDir "DejaVuSans.ttf"
@@ -65,6 +90,7 @@ cmake --build .
 }
 
 Ensure-Font
+Ensure-Ffmpeg
 $Msys = Ensure-Msys2
 Install-Deps -MsysRoot $Msys
 Build-Project -MsysRoot $Msys

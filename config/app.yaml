@@ -13,7 +13,7 @@ font_path_heading: ""
 db_path: "data/leaderboard.db"
 video_dir: "data/videos"
 camera_duration_ms: 3000
-camera_command: "ffmpeg -y -f v4l2 -input_format mjpeg -video_size 1280x720 -framerate 30 -t 3 -i /dev/video0 -c:v libx264 -preset ultrafast {output}"
+camera_command: "ffmpeg -y -f v4l2 -input_format mjpeg -video_size 1280x720 -framerate 30 -t 3 -i {camera} -c:v libx264 -preset ultrafast {output}"
 
 server_url: ""
 auth_token: ""

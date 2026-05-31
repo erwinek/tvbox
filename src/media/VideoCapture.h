@@ -13,6 +13,11 @@ public:
     static std::string ThumbPathFor(const std::string& video_path);
     static std::string FramesDirFor(const std::string& video_path);
 
+    /// Zwraca pierwsza dostepna kamere (Windows: nazwa dshow, Linux: /dev/videoN).
+    static std::string DetectFirstCamera();
+    /// Podstawia {camera} w szablonie; gdy brak placeholdera, zwraca bez zmian.
+    static std::string ResolveCommandTemplate(const std::string& command_template);
+
 private:
     std::string BuildCommand(const std::string& output_path, int duration_ms) const;
 

@@ -8,6 +8,7 @@ if not exist "%ROOT%\build-mingw\tvbox_gui.exe" (
 )
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0copy_mingw_dlls.ps1"
+for /f "delims=" %%P in ('powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')"') do set "PATH=%%P"
 set "PATH=C:\msys64\mingw64\bin;%PATH%"
 
 cd /d "%ROOT%"

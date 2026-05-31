@@ -12,6 +12,8 @@ if (-not (Test-Path $Exe)) {
 
 # libwinpthread-1.dll (nanosleep) + SDL musza byc obok exe lub z MinGW PATH
 & (Join-Path $PSScriptRoot "copy_mingw_dlls.ps1")
+$env:PATH = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+            [System.Environment]::GetEnvironmentVariable("Path", "User")
 $env:PATH = "$MsysBin;$env:PATH"
 
 Push-Location $Root

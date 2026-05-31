@@ -61,8 +61,16 @@ Na laptopie mozesz developowac UI i logike aplikacji; finalny target to nadal RP
 
 ### Szybki start (MSYS2 / MinGW)
 ```cmd
-scripts\setup_windows.cmd   :: instaluje MSYS2, zaleznosci, buduje
+scripts\setup_windows.cmd   :: MSYS2, ffmpeg, zaleznosci, build
 scripts\run_windows.cmd     :: okno 1280x720, config\app-windows.yaml
+```
+
+`setup_windows` instaluje tez **ffmpeg** (winget) do nagrywania z kamerki w dev.
+Kamera wykrywana automatycznie przy starcie (`{camera}` w `camera_command`).
+
+Liste kamer mozesz sprawdzic recznie:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\detect_camera.ps1
 ```
 
 Jesli PowerShell blokuje `.ps1` (Execution Policy), uzyj plikow `.cmd` powyzej.
@@ -104,7 +112,7 @@ Linie sa parsowane w `[src/io/Protocol.cpp](src/io/Protocol.cpp)` na zdarzenia `
 ## Konfiguracja
 Ustawienia w `config/app.yaml` (RPI) i `config/app-windows.yaml` (dev):
 - `serial_port`, `baud_rate`
-- `camera_command` (ffmpeg/libcamera, z `{duration_ms}` i `{output}`)
+- `camera_command` (ffmpeg/libcamera, z `{output}` i `{camera}` — auto-wykrywanie pierwszej kamery)
 - `server_url`, `auth_token` (dla sync)
 - `game_modes` — lista trybow `id:nazwa:mnoznik`, np. `"boxer:BOXER:1.0, kopacz:KOPACZ:1.1"`
 - `sound_coin`, `sound_hit`, `sound_select`, `sound_win`, `music_attract` — opcjonalne audio (puste = cisza)

@@ -66,7 +66,7 @@ bool App::Init() {
         audio_.LoadMusic(cfg_.music_attract);
     }
 
-    video_.SetCommandTemplate(cfg_.camera_command);
+    video_.SetCommandTemplate(media::VideoCapture::ResolveCommandTemplate(cfg_.camera_command));
     sync_.Configure(cfg_.server_url, cfg_.auth_token);
 
     std::vector<game::GameMode> modes;
