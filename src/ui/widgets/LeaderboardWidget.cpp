@@ -81,8 +81,7 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
             }
         }
 
-        const std::string label = std::to_string(line + 1) + ". " + entry.player_id + "  " +
-                                  std::to_string(entry.score);
+        const std::string label = std::to_string(line + 1) + ".  " + std::to_string(entry.score);
         renderer.DrawText(label, ui::FontSize::Small, color, text_x, row_y + (row_h - thumb_h) / 2);
 
         ++line;
