@@ -6,6 +6,14 @@
 
 namespace ui::widgets {
 
+namespace {
+
+constexpr int kBarHeight = 116;
+constexpr int kAccentHeight = 4;
+constexpr int kTitleY = 14;
+
+}  // namespace
+
 SDL_Color AccentColor(Uint32 elapsed_ms) {
     float hue = std::fmod(static_cast<float>(elapsed_ms) * 0.05f, 360.0f);
     float c = 1.0f;
@@ -36,24 +44,21 @@ SDL_Color AccentColor(Uint32 elapsed_ms) {
 void RenderHeader(ui::Renderer& renderer) {
     const Uint32 elapsed = renderer.ticks();
     const int w = renderer.width();
-    const int bar_h = 116;
 
-    // Pasek naglowka: polprzezroczysty, zaokraglony u dolu.
-    renderer.FillRect(SDL_Rect{0, 0, w, bar_h}, SDL_Color{20, 22, 44, 235});
+    renderer.FillRect(SDL_Rect{0, 0, w, kBarHeight}, SDL_Color{20, 22, 44, 235});
     SDL_Color accent = AccentColor(elapsed);
-    renderer.FillRect(SDL_Rect{0, bar_h - 4, w, 4}, accent);
+    renderer.FillRect(SDL_Rect{0, kBarHeight - kAccentHeight, w, kAccentHeight}, accent);
 
-    // "Boxer Video" - dwukolorowy tytul z cieniem, wysrodkowany.
     const std::string a = "Boxer ";
     const std::string b = "Video";
     SDL_Point wa = renderer.MeasureText(a, ui::FontSize::Large);
     SDL_Point wb = renderer.MeasureText(b, ui::FontSize::Large);
     const int total = wa.x + wb.x;
-    const int start_x = (w - total) / 2;
-    const int y = 14;
-    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, start_x, y, false, 255,
-                      1.0f, 3);
-    renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, y, false, 255, 1.0f, 3);
+    const int start_x = renderer.layout().CenterX() - total / 2;
+    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, start_x, kTitleY,
+                      false, 255, 1.0f, 3);
+    renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, kTitleY, false, 255, 1.0f,
+                      3);
 }
 
 }  // namespace ui::widgets

@@ -13,6 +13,18 @@
 
 namespace screens {
 
+namespace {
+
+constexpr int kBadgeY = 150;
+constexpr int kBadgeTextY = 160;
+constexpr int kBadgePadX = 28;
+constexpr int kBadgePadY = 20;
+constexpr int kHintYFromBottom = 90;
+constexpr int kPromptYFromCenter = 100;
+constexpr int kScoreYFromCenter = 120;
+
+}  // namespace
+
 void MeasureScreen::OnEnter(core::AppContext& ctx) {
     (void)ctx;
     counting_ = false;
@@ -56,7 +68,6 @@ std::optional<core::GameState> MeasureScreen::Update(core::AppContext& ctx, doub
 
     elapsed_ms_ += dt_ms;
     const double t = std::min(1.0, elapsed_ms_ / kCountMs);
-    // ease-out
     const double eased = 1.0 - std::pow(1.0 - t, 3.0);
     display_ = eased * target_score_;
 
@@ -69,32 +80,32 @@ std::optional<core::GameState> MeasureScreen::Update(core::AppContext& ctx, doub
 void MeasureScreen::Render(core::AppContext& ctx) {
     ui::Renderer& r = *ctx.renderer;
     const Uint32 elapsed = r.ticks();
-    const int w = r.width();
-    const int h = r.height();
+    const int cx = r.layout().CenterX();
+    const int cy = r.layout().CenterY();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
     r.DrawVerticalGradient(SDL_Color{44, 18, 30, 255}, SDL_Color{8, 6, 16, 255});
     ui::widgets::RenderHeader(r);
 
-    // Plakietka trybu.
     const std::string mode = ctx.session->selected_mode().name;
     SDL_Point mw = r.MeasureText(mode, ui::FontSize::Normal);
-    const SDL_Rect badge{w / 2 - mw.x / 2 - 28, 150, mw.x + 56, mw.y + 20};
+    const SDL_Rect badge{cx - mw.x / 2 - kBadgePadX, kBadgeY, mw.x + 2 * kBadgePadX,
+                         mw.y + kBadgePadY};
     r.Panel(badge, 18, SDL_Color{30, 34, 64, 190}, SDL_Color{90, 100, 170, 160});
-    r.DrawText(mode, ui::FontSize::Normal, SDL_Color{170, 205, 255, 255}, w / 2, 160, true);
+    r.DrawText(mode, ui::FontSize::Normal, SDL_Color{170, 205, 255, 255}, cx, kBadgeTextY, true);
 
     if (!counting_) {
         float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * 0.006f);
         Uint8 alpha = static_cast<Uint8>(140 + static_cast<int>(pulse * 115));
-        r.DrawText("UDERZ TERAZ!", ui::FontSize::Huge, SDL_Color{255, 90, 90, 255}, w / 2,
-                   h / 2 - 100, true, alpha, 1.0f, 4);
-        r.DrawText("(SPACE = symulacja)", ui::FontSize::Small, SDL_Color{150, 150, 175, 255},
-                   w / 2, h - 90, true);
+        r.DrawText("UDERZ TERAZ!", ui::FontSize::Huge, SDL_Color{255, 90, 90, 255}, cx,
+                   cy - kPromptYFromCenter, true, alpha, 1.0f, 4);
+        r.DrawText("(SPACE = symulacja)", ui::FontSize::Small, SDL_Color{150, 150, 175, 255}, cx,
+                   r.height() - kHintYFromBottom, true);
     } else {
         float scale = 1.6f + 0.3f * std::sin(static_cast<float>(elapsed) * 0.01f);
         const std::string value = std::to_string(static_cast<int>(display_));
-        r.DrawText(value, ui::FontSize::Huge, SDL_Color{255, 230, 80, 255}, w / 2, h / 2 - 120,
-                   true, 255, scale, 5);
+        r.DrawText(value, ui::FontSize::Huge, SDL_Color{255, 230, 80, 255}, cx,
+                   cy - kScoreYFromCenter, true, 255, scale, 5);
     }
 
     ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard);

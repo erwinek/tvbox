@@ -1,9 +1,12 @@
 serial_port: "/dev/ttyUSB0"
 baud_rate: 115200
+# Rozdzielczosc design-space (layout UI); faktyczna rozdzielczosc odczytywana z SDL po starcie.
 window_width: 1920
 window_height: 1080
 fullscreen: true
 use_kms: true
+# auto = skala z SDL; lub liczba np. 1.0 do wymuszenia (debug)
+layout_scale: auto
 
 assets_dir: "assets"
 font_path: "assets/fonts/DejaVuSans.ttf"

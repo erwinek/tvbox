@@ -16,6 +16,7 @@ set(TVBOX_SOURCES
     src/io/KeyboardInput.cpp
     src/io/SerialInput.cpp
     src/ui/Renderer.cpp
+    src/ui/Layout.cpp
     src/ui/FontManager.cpp
     src/ui/TextureCache.cpp
     src/ui/FrameSequencePlayer.cpp

@@ -1,10 +1,14 @@
 # Konfiguracja deweloperska na Windows (okno, bez KMS/DRM)
 serial_port: "COM3"
 baud_rate: 115200
-window_width: 1280
-window_height: 720
+# Design-space taki sam jak produkcja (1920x1080); okno mniejsze do dev.
+window_width: 1920
+window_height: 1080
+display_width: 1280
+display_height: 720
 fullscreen: false
 use_kms: false
+layout_scale: auto
 
 assets_dir: "assets"
 # Nowoczesne fonty Windows: Segoe UI (tekst) + Bahnschrift (naglowki)

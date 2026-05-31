@@ -4,6 +4,15 @@
 
 namespace ui::widgets {
 
+namespace {
+
+constexpr int kBarPadY = 16;
+constexpr int kTextPadY = 8;
+constexpr int kTextGap = 100;
+constexpr float kScrollSpeed = 1.5f;
+
+}  // namespace
+
 void ScrollBar::Render(ui::Renderer& renderer, const std::string& text) {
     const int w = renderer.width();
     const int h = renderer.height();
@@ -20,18 +29,19 @@ void ScrollBar::Render(ui::Renderer& renderer, const std::string& text) {
         return;
     }
 
-    renderer.FillRect(SDL_Rect{0, h - th - 16, w, th + 16}, SDL_Color{12, 12, 24, 255});
+    renderer.FillRect(SDL_Rect{0, h - th - kBarPadY, w, th + kBarPadY},
+                      SDL_Color{12, 12, 24, 255});
 
-    scroll_x_ -= 1.5f;
+    scroll_x_ -= kScrollSpeed;
     if (scroll_x_ < static_cast<float>(-tw)) {
         scroll_x_ = static_cast<float>(w);
     }
 
     const SDL_Color color{120, 120, 160, 255};
-    const int y = h - th - 8;
+    const int y = h - th - kTextPadY;
     renderer.DrawText(text, ui::FontSize::Small, color, static_cast<int>(scroll_x_), y, false);
     renderer.DrawText(text, ui::FontSize::Small, color,
-                      static_cast<int>(scroll_x_) + tw + 100, y, false);
+                      static_cast<int>(scroll_x_) + tw + kTextGap, y, false);
 }
 
 }  // namespace ui::widgets

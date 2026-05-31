@@ -11,6 +11,18 @@
 
 namespace screens {
 
+namespace {
+
+constexpr int kBoardW = 540;
+constexpr int kBoardMarginRight = 40;
+constexpr int kPanelW = 620;
+constexpr int kPanelH = 280;
+constexpr int kParticleCount = 36;
+constexpr int kParticleMinY = 140;
+constexpr int kParticleZoneH = 200;
+
+}  // namespace
+
 void AttractScreen::OnEnter(core::AppContext& ctx) {
     board_.Invalidate();
     if (ctx.refresh_leaderboard) {
@@ -25,7 +37,7 @@ std::optional<core::GameState> AttractScreen::HandleEvent(const core::InputEvent
                                                           core::AppContext& ctx) {
     switch (event.type) {
         case core::InputType::Quit:
-            return std::nullopt;  // wyjscie obsluguje App
+            return std::nullopt;
         case core::InputType::Coin:
             ctx.session->credits().Add();
             if (ctx.audio) {
@@ -55,14 +67,13 @@ void AttractScreen::Render(core::AppContext& ctx) {
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
     r.DrawVerticalGradient(SDL_Color{26, 28, 56, 255}, SDL_Color{6, 7, 16, 255});
 
-    // Czastki w tle.
-    for (int i = 0; i < 36; ++i) {
+    for (int i = 0; i < kParticleCount; ++i) {
         float seed = static_cast<float>(i * 137 + 51);
         float px = std::fmod(seed * 7.3f + static_cast<float>(elapsed) * (0.03f + seed * 0.0001f),
                              static_cast<float>(w));
         float py = std::fmod(seed * 13.7f + static_cast<float>(elapsed) * (0.02f + seed * 0.00005f),
-                             static_cast<float>(h - 200)) +
-                   140.0f;
+                             static_cast<float>(h - kParticleZoneH)) +
+                   static_cast<float>(kParticleMinY);
         float brightness = 0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * 0.005f + seed);
         Uint8 a = static_cast<Uint8>(30 + static_cast<int>(brightness * 60));
         int size = 3 + static_cast<int>(brightness * 4);
@@ -72,15 +83,10 @@ void AttractScreen::Render(core::AppContext& ctx) {
 
     ui::widgets::RenderHeader(r);
 
-    // Region po lewej (ranking jest po prawej).
-    const int board_w = 540;
-    const int left_cx = (w - board_w - 40) / 2 + 20;
-    const int panel_w = 620;
-    const int panel_h = 280;
-    const SDL_Rect panel{left_cx - panel_w / 2, h / 2 - panel_h / 2, panel_w, panel_h};
+    const int left_cx = (w - kBoardW - kBoardMarginRight) / 2 + 20;
+    const SDL_Rect panel{left_cx - kPanelW / 2, h / 2 - kPanelH / 2, kPanelW, kPanelH};
     r.Panel(panel, 28, SDL_Color{18, 20, 40, 180}, SDL_Color{70, 80, 150, 160});
 
-    // Pulsujace "INSERT COIN"
     {
         float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * 0.003f);
         Uint8 alpha = static_cast<Uint8>(120 + static_cast<int>(pulse * 135));
@@ -90,7 +96,6 @@ void AttractScreen::Render(core::AppContext& ctx) {
                    h / 2 - 70 + y_offset, true, alpha, 1.0f, 3);
     }
 
-    // "PLAY WITH ME!"
     {
         float pulse2 = 0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * 0.004f + 1.5f);
         Uint8 alpha2 = static_cast<Uint8>(90 + static_cast<int>(pulse2 * 165));

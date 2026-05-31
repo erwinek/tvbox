@@ -106,8 +106,20 @@ Config LoadConfig(const std::string& path) {
     if (map.count("baud_rate")) cfg.baud_rate = std::stoi(map["baud_rate"]);
     if (map.count("window_width")) cfg.window_width = std::stoi(map["window_width"]);
     if (map.count("window_height")) cfg.window_height = std::stoi(map["window_height"]);
+    if (map.count("display_width")) cfg.display_width = std::stoi(map["display_width"]);
+    if (map.count("display_height")) cfg.display_height = std::stoi(map["display_height"]);
     if (map.count("fullscreen")) cfg.fullscreen = ParseBool(map["fullscreen"]);
     if (map.count("use_kms")) cfg.use_kms = ParseBool(map["use_kms"]);
+    if (map.count("layout_scale")) {
+        const std::string v = map["layout_scale"];
+        if (v != "auto" && !v.empty()) {
+            try {
+                cfg.layout_scale = std::stof(v);
+            } catch (...) {
+                cfg.layout_scale = 0.f;
+            }
+        }
+    }
     if (map.count("assets_dir")) cfg.assets_dir = map["assets_dir"];
     if (map.count("font_path")) cfg.font_path = map["font_path"];
     if (map.count("font_path_heading")) cfg.font_path_heading = map["font_path_heading"];

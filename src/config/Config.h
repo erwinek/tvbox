@@ -16,8 +16,13 @@ struct Config {
     int baud_rate = 115200;
     int window_width = 1920;
     int window_height = 1080;
+    // Opcjonalny rozmiar okna (windowed); 0 = uzyj window_width/height.
+    int display_width = 0;
+    int display_height = 0;
     bool fullscreen = true;
     bool use_kms = true;
+    // 0 = auto (min(actual/design)); >0 wymusza skale layoutu (debug).
+    float layout_scale = 0.f;
 
     std::string assets_dir = "assets";
     std::string font_path = "assets/fonts/DejaVuSans.ttf";
