@@ -75,6 +75,8 @@ Sterowanie w trybie dev:
 UART (`COM3` domyslnie) i kamera sa opcjonalne — aplikacja startuje bez nich.
 Serial mozesz podlaczyc przez USB-UART (ESP32); port ustaw w `config/app-windows.yaml`.
 
+**Blad `nanosleep could not be located`:** uruchamiaj przez `scripts\run_windows.cmd` (kopiuje DLL MinGW obok exe). Nie uruchamiaj `tvbox_gui.exe` bezposrednio z Eksploratora.
+
 Alternatywnie MSVC + vcpkg:
 ```powershell
 git clone https://github.com/microsoft/vcpkg $env:USERPROFILE\vcpkg

@@ -68,6 +68,7 @@ Ensure-Font
 $Msys = Ensure-Msys2
 Install-Deps -MsysRoot $Msys
 Build-Project -MsysRoot $Msys
+& (Join-Path $PSScriptRoot "copy_mingw_dlls.ps1")
 
 Write-Host ""
 Write-Host "Gotowe. Uruchom: .\scripts\run_windows.ps1"
