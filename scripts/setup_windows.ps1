@@ -1,0 +1,72 @@
+#Requires -Version 5.1
+$ErrorActionPreference = "Stop"
+$Root = Split-Path -Parent $PSScriptRoot
+
+function Ensure-Msys2 {
+    $MsysRoot = "C:\msys64"
+    if (-not (Test-Path "$MsysRoot\usr\bin\bash.exe")) {
+        Write-Host "Instalacja MSYS2 (MinGW64)..."
+        winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements
+        if (-not (Test-Path "$MsysRoot\usr\bin\bash.exe")) {
+            throw "MSYS2 nie zostal zainstalowany w $MsysRoot"
+        }
+    }
+    return $MsysRoot
+}
+
+function Ensure-Font {
+    $FontDir = Join-Path $Root "assets\fonts"
+    $FontPath = Join-Path $FontDir "DejaVuSans.ttf"
+    if (-not (Test-Path $FontPath)) {
+        New-Item -ItemType Directory -Force -Path $FontDir | Out-Null
+        $ZipUrl = "https://downloads.sourceforge.net/project/dejavu/dejavu/2.37/dejavu-fonts-ttf-2.37.zip"
+        $ZipPath = Join-Path $env:TEMP "dejavu-fonts-ttf-2.37.zip"
+        Write-Host "Pobieranie fontu DejaVuSans.ttf..."
+        & curl.exe -L -o $ZipPath $ZipUrl
+        Expand-Archive -Path $ZipPath -DestinationPath (Join-Path $env:TEMP "dejavu-fonts") -Force
+        Copy-Item (Join-Path $env:TEMP "dejavu-fonts\dejavu-fonts-ttf-2.37\ttf\DejaVuSans.ttf") $FontPath
+    }
+}
+
+function Install-Deps {
+    param([string]$MsysRoot)
+    $Packages = @(
+        "mingw-w64-x86_64-gcc",
+        "mingw-w64-x86_64-cmake",
+        "mingw-w64-x86_64-ninja",
+        "mingw-w64-x86_64-pkgconf",
+        "mingw-w64-x86_64-SDL2",
+        "mingw-w64-x86_64-SDL2_ttf",
+        "mingw-w64-x86_64-SDL2_image",
+        "mingw-w64-x86_64-sqlite3",
+        "mingw-w64-x86_64-curl"
+    )
+    $PackageList = ($Packages -join " ")
+    Write-Host "Instalacja zaleznosci MSYS2..."
+    $Bash = Join-Path $MsysRoot "usr\bin\bash.exe"
+    & $Bash -lc "pacman -Syy --noconfirm --needed $PackageList"
+}
+
+function Build-Project {
+    param([string]$MsysRoot)
+    $BuildDir = Join-Path $Root "build-mingw"
+    $RootPosix = ($Root -replace '\\', '/')
+    $BuildPosix = ($BuildDir -replace '\\', '/')
+    Write-Host "Budowanie w $BuildDir ..."
+    $Bash = Join-Path $MsysRoot "usr\bin\bash.exe"
+    & $Bash -lc @"
+export PATH=/mingw64/bin:/usr/bin:`$PATH
+mkdir -p '$BuildPosix'
+cd '$BuildPosix'
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug '$RootPosix'
+cmake --build .
+"@
+}
+
+Ensure-Font
+$Msys = Ensure-Msys2
+Install-Deps -MsysRoot $Msys
+Build-Project -MsysRoot $Msys
+
+Write-Host ""
+Write-Host "Gotowe. Uruchom: .\scripts\run_windows.ps1"

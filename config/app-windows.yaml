@@ -1,0 +1,20 @@
+# Konfiguracja deweloperska na Windows (okno, bez KMS/DRM)
+serial_port: "COM3"
+baud_rate: 115200
+window_width: 1280
+window_height: 720
+fullscreen: false
+use_kms: false
+
+assets_dir: "assets"
+font_path: "assets/fonts/DejaVuSans.ttf"
+
+db_path: "data/leaderboard.db"
+video_dir: "data/videos"
+camera_duration_ms: 3000
+camera_command: 'ffmpeg -y -f dshow -video_size 1280x720 -framerate 30 -i video="Integrated Camera" -t 3 -c:v libx264 -preset ultrafast "{output}"'
+
+server_url: ""
+auth_token: ""
+sync_enabled: false
+leaderboard_size: 10

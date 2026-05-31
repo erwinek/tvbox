@@ -16,10 +16,24 @@ static std::string Trim(const std::string& value) {
     return value.substr(start, end - start + 1);
 }
 
+static std::string Unescape(const std::string& value) {
+    std::string out;
+    out.reserve(value.size());
+    for (std::size_t i = 0; i < value.size(); ++i) {
+        if (value[i] == '\\' && i + 1 < value.size()) {
+            out.push_back(value[i + 1]);
+            ++i;
+        } else {
+            out.push_back(value[i]);
+        }
+    }
+    return out;
+}
+
 static std::string Unquote(const std::string& value) {
     if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
                               (value.front() == '\'' && value.back() == '\''))) {
-        return value.substr(1, value.size() - 2);
+        return Unescape(value.substr(1, value.size() - 2));
     }
     return value;
 }

@@ -25,6 +25,35 @@ cmake ..
 make -j4
 ```
 
+## Development na Windows (laptop)
+
+Na laptopie mozesz developowac UI i logike aplikacji; finalny target to nadal RPI4/5.
+
+### Szybki start (MSYS2 / MinGW)
+```cmd
+scripts\setup_windows.cmd   :: instaluje MSYS2, zaleznosci, buduje
+scripts\run_windows.cmd     :: okno 1280x720, config\app-windows.yaml
+```
+
+Jesli PowerShell blokuje `.ps1` (Execution Policy), uzyj plikow `.cmd` powyzej.
+Alternatywnie: `powershell -ExecutionPolicy Bypass -File .\scripts\run_windows.ps1`
+
+Sterowanie w trybie dev:
+- `SPACE` — symulacja uderzenia (score + ranking)
+- `ESC` — wyjscie
+
+UART (`COM3` domyslnie) i kamera sa opcjonalne — aplikacja startuje bez nich.
+Serial mozesz podlaczyc przez USB-UART (ESP32); port ustaw w `config/app-windows.yaml`.
+
+Alternatywnie MSVC + vcpkg:
+```powershell
+git clone https://github.com/microsoft/vcpkg $env:USERPROFILE\vcpkg
+.\vcpkg\bootstrap-vcpkg.bat
+cmake -B build-msvc -S . -DCMAKE_TOOLCHAIN_FILE=$env:USERPROFILE\vcpkg\scripts\buildsystems\vcpkg.cmake
+cmake --build build-msvc --config Debug
+.\build-msvc\Debug\tvbox_gui.exe config\app-windows.yaml
+```
+
 ## Uruchomienie (bez XServera, KMS/DRM)
 ```
 SDL_VIDEODRIVER=kmsdrm SDL_RENDER_DRIVER=opengles2 SDL_FBDEV=/dev/fb0 \
