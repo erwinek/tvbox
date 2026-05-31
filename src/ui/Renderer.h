@@ -15,7 +15,8 @@ class Renderer {
 public:
     ~Renderer();
 
-    bool Init(int width, int height, bool fullscreen, const std::string& font_path);
+    bool Init(int width, int height, bool fullscreen, const std::string& font_path,
+              const std::string& heading_font_path = "");
     void Shutdown();
 
     SDL_Renderer* sdl() const { return renderer_; }
@@ -28,13 +29,23 @@ public:
     void BeginFrame(SDL_Color clear);
     void EndFrame();
 
+    // Wypelnia caly ekran pionowym gradientem (nowoczesne tlo).
+    void DrawVerticalGradient(SDL_Color top, SDL_Color bottom);
+
     void FillRect(const SDL_Rect& rect, SDL_Color color);
     void DrawRect(const SDL_Rect& rect, SDL_Color color);
     void DrawTexture(SDL_Texture* texture, const SDL_Rect& dst);
 
-    // Rysuje tekst; gdy center_x, x jest srodkiem. Zwraca prostokat docelowy.
+    // Zaokraglony prostokat (oble krawedzie) wypelniony kolorem (z alfa).
+    void FillRoundedRect(const SDL_Rect& rect, int radius, SDL_Color color);
+    // Polprzezroczysty panel z obwodka: tlo + cienka ramka, oble krawedzie.
+    void Panel(const SDL_Rect& rect, int radius, SDL_Color fill, SDL_Color border);
+
+    // Rysuje tekst; gdy center_x, x jest srodkiem. shadow_off > 0 dodaje cien.
+    // Zwraca prostokat docelowy.
     SDL_Rect DrawText(const std::string& text, FontSize size, SDL_Color color, int x, int y,
-                      bool center_x = false, Uint8 alpha = 255, float scale = 1.0f);
+                      bool center_x = false, Uint8 alpha = 255, float scale = 1.0f,
+                      int shadow_off = 0);
 
     // Rysuje obraz z cache (po sciezce) w danym prostokacie.
     void DrawImage(const std::string& path, const SDL_Rect& dst);
@@ -45,6 +56,9 @@ public:
 private:
     SDL_Texture* MakeTextTexture(const std::string& text, FontSize size, SDL_Color color,
                                  int* out_w, int* out_h);
+
+    void RenderTextOnce(const std::string& text, FontSize size, SDL_Color color, int x, int y,
+                        bool center_x, Uint8 alpha, float scale);
 
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;

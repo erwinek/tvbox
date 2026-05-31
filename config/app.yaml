@@ -7,6 +7,8 @@ use_kms: true
 
 assets_dir: "assets"
 font_path: "assets/fonts/DejaVuSans.ttf"
+# Opcjonalny font naglowkow (pusty => uzywany font_path)
+font_path_heading: ""
 
 db_path: "data/leaderboard.db"
 video_dir: "data/videos"

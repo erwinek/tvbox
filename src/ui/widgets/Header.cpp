@@ -36,18 +36,24 @@ SDL_Color AccentColor(Uint32 elapsed_ms) {
 void RenderHeader(ui::Renderer& renderer) {
     const Uint32 elapsed = renderer.ticks();
     const int w = renderer.width();
+    const int bar_h = 116;
 
-    renderer.FillRect(SDL_Rect{0, 0, w, 110}, SDL_Color{16, 16, 32, 255});
-
+    // Pasek naglowka: polprzezroczysty, zaokraglony u dolu.
+    renderer.FillRect(SDL_Rect{0, 0, w, bar_h}, SDL_Color{20, 22, 44, 235});
     SDL_Color accent = AccentColor(elapsed);
-    renderer.FillRect(SDL_Rect{0, 108, w, 4}, accent);
+    renderer.FillRect(SDL_Rect{0, bar_h - 4, w, 4}, accent);
 
-    renderer.DrawText("TVBOX", ui::FontSize::Huge, accent, w / 2, 2, true);
-
-    // Podtytul wyrownany do prawej.
-    SDL_Point sub = renderer.MeasureText("ProGames", ui::FontSize::Small);
-    renderer.DrawText("ProGames", ui::FontSize::Small, SDL_Color{160, 160, 180, 255},
-                      w - sub.x - 30, 78, false);
+    // "Boxer Video" - dwukolorowy tytul z cieniem, wysrodkowany.
+    const std::string a = "Boxer ";
+    const std::string b = "Video";
+    SDL_Point wa = renderer.MeasureText(a, ui::FontSize::Large);
+    SDL_Point wb = renderer.MeasureText(b, ui::FontSize::Large);
+    const int total = wa.x + wb.x;
+    const int start_x = (w - total) / 2;
+    const int y = 14;
+    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, start_x, y, false, 255,
+                      1.0f, 3);
+    renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, y, false, 255, 1.0f, 3);
 }
 
 }  // namespace ui::widgets

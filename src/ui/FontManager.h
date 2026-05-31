@@ -12,7 +12,9 @@ class FontManager {
 public:
     ~FontManager();
 
-    bool Load(const std::string& font_path);
+    // body_path: font dla tekstu (Small/Normal). heading_path: font dla naglowkow
+    // (Large/Huge); pusty => uzywany jest body_path.
+    bool Load(const std::string& body_path, const std::string& heading_path = "");
     void Unload();
 
     TTF_Font* Get(FontSize size) const;

@@ -21,6 +21,7 @@ struct Config {
 
     std::string assets_dir = "assets";
     std::string font_path = "assets/fonts/DejaVuSans.ttf";
+    std::string font_path_heading;  // pusty => uzywany font_path
 
     std::string db_path = "data/leaderboard.db";
     std::string video_dir = "data/videos";

@@ -48,7 +48,8 @@ bool App::Init() {
     std::filesystem::create_directories("data");
     std::filesystem::create_directories(cfg_.video_dir);
 
-    if (!renderer_.Init(cfg_.window_width, cfg_.window_height, cfg_.fullscreen, cfg_.font_path)) {
+    if (!renderer_.Init(cfg_.window_width, cfg_.window_height, cfg_.fullscreen, cfg_.font_path,
+                        cfg_.font_path_heading)) {
         return false;
     }
 

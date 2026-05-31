@@ -7,7 +7,9 @@ fullscreen: false
 use_kms: false
 
 assets_dir: "assets"
-font_path: "assets/fonts/DejaVuSans.ttf"
+# Nowoczesne fonty Windows: Segoe UI (tekst) + Bahnschrift (naglowki)
+font_path: "C:/Windows/Fonts/segoeui.ttf"
+font_path_heading: "C:/Windows/Fonts/bahnschrift.ttf"
 
 db_path: "data/leaderboard.db"
 video_dir: "data/videos"

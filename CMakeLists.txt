@@ -22,6 +22,7 @@ set(TVBOX_SOURCES
     src/ui/widgets/Header.cpp
     src/ui/widgets/ScrollBar.cpp
     src/ui/widgets/LeaderboardWidget.cpp
+    src/ui/widgets/Hud.cpp
     src/screens/AttractScreen.cpp
     src/screens/ModeSelectScreen.cpp
     src/screens/MeasureScreen.cpp

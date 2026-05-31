@@ -5,6 +5,7 @@
 #include "media/AudioPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
+#include "ui/widgets/Hud.h"
 
 namespace screens {
 
@@ -54,25 +55,36 @@ void ModeSelectScreen::Render(core::AppContext& ctx) {
     ui::Renderer& r = *ctx.renderer;
     const int w = r.width();
 
-    r.BeginFrame(SDL_Color{8, 8, 18, 255});
+    r.BeginFrame(SDL_Color{0, 0, 0, 255});
+    r.DrawVerticalGradient(SDL_Color{30, 24, 56, 255}, SDL_Color{8, 6, 16, 255});
     ui::widgets::RenderHeader(r);
 
-    r.DrawText("WYBIERZ TRYB", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, w / 2, 180, true);
+    r.DrawText("WYBIERZ TRYB", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, w / 2, 180, true,
+               255, 1.0f, 3);
 
     const auto& modes = ctx.session->modes();
     const int selected = ctx.session->selected_index();
-    int y = 340;
+    const int btn_w = 560;
+    const int btn_h = 96;
+    const int gap = 28;
+    int y = 320;
     for (int i = 0; i < static_cast<int>(modes.size()); ++i) {
         const bool active = (i == selected);
-        SDL_Color color = active ? SDL_Color{100, 255, 140, 255} : SDL_Color{160, 160, 180, 255};
-        const std::string label = (active ? "> " : "  ") + modes[i].name + (active ? " <" : "");
-        r.DrawText(label, ui::FontSize::Large, color, w / 2, y, true);
-        y += 110;
+        const SDL_Rect btn{w / 2 - btn_w / 2, y, btn_w, btn_h};
+        if (active) {
+            r.Panel(btn, 20, SDL_Color{40, 90, 60, 220}, SDL_Color{100, 255, 150, 220});
+        } else {
+            r.Panel(btn, 20, SDL_Color{22, 24, 46, 170}, SDL_Color{70, 80, 150, 130});
+        }
+        SDL_Color color = active ? SDL_Color{180, 255, 200, 255} : SDL_Color{180, 185, 205, 255};
+        r.DrawText(modes[i].name, ui::FontSize::Large, color, w / 2, y + 6, true, 255, 1.0f, 2);
+        y += btn_h + gap;
     }
 
     r.DrawText("strzalki = wybor    ENTER = start", ui::FontSize::Small,
-               SDL_Color{150, 150, 170, 255}, w / 2, r.height() - 80, true);
+               SDL_Color{160, 165, 190, 255}, w / 2, r.height() - 90, true);
 
+    ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard);
     r.EndFrame();
 }
 
