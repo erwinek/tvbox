@@ -29,6 +29,22 @@ Layout Layout::Create(int design_w, int design_h, int actual_w, int actual_h,
     return layout;
 }
 
+int Layout::PW(float frac) const {
+    return static_cast<int>(std::lround(frac * design_w));
+}
+
+int Layout::PH(float frac) const {
+    return static_cast<int>(std::lround(frac * design_h));
+}
+
+int Layout::PM(float frac) const {
+    return static_cast<int>(std::lround(frac * MinDim()));
+}
+
+SDL_Rect Layout::PRect(float x, float y, float w, float h) const {
+    return SDL_Rect{PW(x), PH(y), PW(w), PH(h)};
+}
+
 int Layout::X(int design_px) const {
     return offset_x + static_cast<int>(std::lround(design_px * scale));
 }

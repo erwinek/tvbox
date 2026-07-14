@@ -83,7 +83,7 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
     textures_.SetRenderer(renderer_);
 
-    if (!fonts_.Load(font_path, heading_font_path)) {
+    if (!fonts_.Load(font_path, heading_font_path, layout_.MinDim())) {
         util::Log(util::LogLevel::Warn, "Renderer: fonts not fully loaded");
     }
     return true;

@@ -1,8 +1,10 @@
 serial_port: "/dev/ttyUSB0"
 baud_rate: 115200
 # Rozdzielczosc design-space (layout UI); faktyczna rozdzielczosc odczytywana z SDL po starcie.
-window_width: 1920
-window_height: 1080
+# Monitor docelowy jest pionowy: FullHD portrait (dla 4K portrait wpisz 2160x3840 -
+# layout jest procentowy i dopasuje sie automatycznie).
+window_width: 1080
+window_height: 1920
 fullscreen: true
 use_kms: true
 # auto = skala z SDL; lub liczba np. 1.0 do wymuszenia (debug)

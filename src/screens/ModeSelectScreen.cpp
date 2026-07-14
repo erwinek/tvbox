@@ -9,17 +9,6 @@
 
 namespace screens {
 
-namespace {
-
-constexpr int kTitleY = 180;
-constexpr int kBtnW = 560;
-constexpr int kBtnH = 96;
-constexpr int kBtnGap = 28;
-constexpr int kBtnStartY = 320;
-constexpr int kHintYFromBottom = 90;
-
-}  // namespace
-
 void ModeSelectScreen::OnEnter(core::AppContext& ctx) {
     (void)ctx;
     idle_ms_ = 0.0;
@@ -64,33 +53,43 @@ std::optional<core::GameState> ModeSelectScreen::Update(core::AppContext& ctx, d
 
 void ModeSelectScreen::Render(core::AppContext& ctx) {
     ui::Renderer& r = *ctx.renderer;
-    const int cx = r.layout().CenterX();
+    const ui::Layout& lay = r.layout();
+    const int cx = lay.CenterX();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
     r.DrawVerticalGradient(SDL_Color{30, 24, 56, 255}, SDL_Color{8, 6, 16, 255});
-    ui::widgets::RenderHeader(r);
+    const int header_h = ui::widgets::RenderHeader(r);
 
-    r.DrawText("WYBIERZ TRYB", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, cx, kTitleY,
+    const int title_y = header_h + lay.PH(0.05f);
+    r.DrawText("WYBIERZ TRYB", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, cx, title_y,
                true, 255, 1.0f, 3);
+
+    // Przyciski: szersze w pionie (70% szer.), wezsze w poziomie (30%).
+    const int btn_w = lay.PW(lay.IsPortrait() ? 0.70f : 0.30f);
+    const int btn_h = lay.PH(lay.IsPortrait() ? 0.065f : 0.09f);
+    const int btn_gap = lay.PH(lay.IsPortrait() ? 0.018f : 0.026f);
+    const int title_h = r.MeasureText("WYBIERZ TRYB", ui::FontSize::Large).y;
 
     const auto& modes = ctx.session->modes();
     const int selected = ctx.session->selected_index();
-    int y = kBtnStartY;
+    int y = title_y + title_h + lay.PH(0.04f);
     for (int i = 0; i < static_cast<int>(modes.size()); ++i) {
         const bool active = (i == selected);
-        const SDL_Rect btn{cx - kBtnW / 2, y, kBtnW, kBtnH};
+        const SDL_Rect btn{cx - btn_w / 2, y, btn_w, btn_h};
         if (active) {
-            r.Panel(btn, 20, SDL_Color{40, 90, 60, 220}, SDL_Color{100, 255, 150, 220});
+            r.Panel(btn, lay.PM(0.019f), SDL_Color{40, 90, 60, 220}, SDL_Color{100, 255, 150, 220});
         } else {
-            r.Panel(btn, 20, SDL_Color{22, 24, 46, 170}, SDL_Color{70, 80, 150, 130});
+            r.Panel(btn, lay.PM(0.019f), SDL_Color{22, 24, 46, 170}, SDL_Color{70, 80, 150, 130});
         }
         SDL_Color color = active ? SDL_Color{180, 255, 200, 255} : SDL_Color{180, 185, 205, 255};
-        r.DrawText(modes[i].name, ui::FontSize::Large, color, cx, y + 6, true, 255, 1.0f, 2);
-        y += kBtnH + kBtnGap;
+        const int label_h = r.MeasureText(modes[i].name, ui::FontSize::Large).y;
+        r.DrawText(modes[i].name, ui::FontSize::Large, color, cx, y + (btn_h - label_h) / 2, true,
+                   255, 1.0f, 2);
+        y += btn_h + btn_gap;
     }
 
     r.DrawText("strzalki = wybor    ENTER = start", ui::FontSize::Small,
-               SDL_Color{160, 165, 190, 255}, cx, r.height() - kHintYFromBottom, true);
+               SDL_Color{160, 165, 190, 255}, cx, r.height() - lay.PH(0.083f), true);
 
     ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard);
     r.EndFrame();

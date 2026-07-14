@@ -1,0 +1,36 @@
+# Konfiguracja deweloperska na Windows - podglad ukladu PIONOWEGO (jak monitor docelowy).
+serial_port: "COM3"
+baud_rate: 115200
+# Design-space pionowy jak na produkcji; male okno do podgladu na laptopie.
+window_width: 1080
+window_height: 1920
+display_width: 480
+display_height: 854
+fullscreen: false
+use_kms: false
+layout_scale: auto
+
+assets_dir: "assets"
+# Nowoczesne fonty Windows: Segoe UI (tekst) + Bahnschrift (naglowki)
+font_path: "C:/Windows/Fonts/segoeui.ttf"
+font_path_heading: "C:/Windows/Fonts/bahnschrift.ttf"
+
+db_path: "data/leaderboard.db"
+video_dir: "data/videos"
+camera_duration_ms: 3000
+camera_command: 'ffmpeg -y -f dshow -video_size 1280x720 -framerate 30 -i video="{camera}" -t 3 -c:v libx264 -preset ultrafast "{output}"'
+
+server_url: ""
+auth_token: ""
+sync_enabled: false
+leaderboard_size: 10
+
+# Tryby gry: id:nazwa:mnoznik, oddzielone przecinkami
+game_modes: "boxer:BOXER:1.0, kopacz:KOPACZ:1.1"
+
+# Audio (opcjonalne; puste = brak dzwieku). Pliki .wav / .ogg w assets/sfx/
+sound_coin: ""
+sound_hit: ""
+sound_select: ""
+sound_win: ""
+music_attract: ""

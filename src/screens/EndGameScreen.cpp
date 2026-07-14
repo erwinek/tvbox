@@ -11,22 +11,6 @@
 
 namespace screens {
 
-namespace {
-
-constexpr int kLeftCenterX = 640;  // design-space: 1920 / 3
-constexpr int kScorePanelW = 560;
-constexpr int kScorePanelH = 240;
-constexpr int kScorePanelY = 150;
-constexpr int kCongratsY = 168;
-constexpr int kScoreY = 250;
-constexpr int kReplayW = 480;
-constexpr int kReplayY = 430;
-constexpr int kReplayFramePad = 8;
-constexpr int kReplayPanelRadius = 16;
-constexpr int kReplayHintYFromBottom = 150;
-
-}  // namespace
-
 void EndGameScreen::OnEnter(core::AppContext& ctx) {
     elapsed_ms_ = 0.0;
     board_.Invalidate();
@@ -63,22 +47,46 @@ std::optional<core::GameState> EndGameScreen::Update(core::AppContext& ctx, doub
 
 void EndGameScreen::Render(core::AppContext& ctx) {
     ui::Renderer& r = *ctx.renderer;
+    const ui::Layout& lay = r.layout();
     const Uint32 elapsed = r.ticks();
+    const int w = r.width();
+    const int h = r.height();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
     r.DrawVerticalGradient(SDL_Color{24, 30, 56, 255}, SDL_Color{6, 7, 16, 255});
-    ui::widgets::RenderHeader(r);
+    const int header_h = ui::widgets::RenderHeader(r);
+    const int bottom_reserved = lay.PH(0.12f);  // HUD + scrollbar
 
-    const SDL_Rect score_panel{kLeftCenterX - kScorePanelW / 2, kScorePanelY, kScorePanelW,
-                               kScorePanelH};
-    r.Panel(score_panel, 26, SDL_Color{18, 20, 40, 190}, SDL_Color{90, 100, 170, 170});
+    // Pion: wynik, replay i ranking jeden pod drugim, wysrodkowane.
+    // Poziom: lewa kolumna (wynik + replay), ranking w prawej kolumnie.
+    int col_cx;
+    SDL_Rect board_area;
+    if (lay.IsPortrait()) {
+        col_cx = lay.CenterX();
+        board_area = SDL_Rect{lay.PW(0.05f), 0, lay.PW(0.90f), 0};  // y/h uzupelnione nizej
+    } else {
+        const int board_w = lay.PW(0.30f);
+        const int board_y = header_h + lay.PH(0.04f);
+        board_area = SDL_Rect{w - board_w - lay.PW(0.02f), board_y, board_w,
+                              h - board_y - bottom_reserved};
+        col_cx = (w - board_w - lay.PW(0.02f)) / 2;
+    }
 
-    r.DrawText("GRATULACJE!", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, kLeftCenterX,
-               kCongratsY, true, 255, 1.0f, 3);
+    const int panel_w = lay.IsPortrait() ? lay.PW(0.72f) : lay.PW(0.30f);
+    const int panel_h = lay.PH(lay.IsPortrait() ? 0.15f : 0.22f);
+    const int panel_y = header_h + lay.PH(0.025f);
+    const SDL_Rect score_panel{col_cx - panel_w / 2, panel_y, panel_w, panel_h};
+    r.Panel(score_panel, lay.PM(0.024f), SDL_Color{18, 20, 40, 190}, SDL_Color{90, 100, 170, 170});
+
+    r.DrawText("GRATULACJE!", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, col_cx,
+               panel_y + lay.PH(0.015f), true, 255, 1.0f, 3);
 
     float scale_pulse = 1.6f + 0.2f * std::sin(static_cast<float>(elapsed) * 0.005f);
     r.DrawText(std::to_string(ctx.session->score()), ui::FontSize::Huge,
-               SDL_Color{255, 230, 80, 255}, kLeftCenterX, kScoreY, true, 255, scale_pulse, 5);
+               SDL_Color{255, 230, 80, 255}, col_cx, panel_y + lay.PH(0.075f), true, 255,
+               scale_pulse, 5);
+
+    int replay_bottom = score_panel.y + score_panel.h;
 
     const ui::ScoreEntry* newest = nullptr;
     for (const auto& e : ctx.leaderboard) {
@@ -93,27 +101,42 @@ void EndGameScreen::Render(core::AppContext& ctx) {
         }
         SDL_Texture* frame = replay_.FrameAt(elapsed, 10);
         if (frame) {
-            int disp_w = kReplayW;
-            int disp_h = 360;
+            const int frame_pad = lay.PM(0.0075f);
+            const int replay_y = score_panel.y + score_panel.h + lay.PH(0.03f);
+            int disp_w = lay.IsPortrait() ? lay.PW(0.66f) : lay.PW(0.25f);
+            int disp_h = disp_w * 3 / 4;
             if (replay_.width() > 0 && replay_.height() > 0) {
                 float aspect = static_cast<float>(replay_.width()) /
                                static_cast<float>(replay_.height());
                 disp_h = static_cast<int>(static_cast<float>(disp_w) / aspect);
             }
-            const SDL_Rect framebox{kLeftCenterX - disp_w / 2 - kReplayFramePad,
-                                    kReplayY - kReplayFramePad, disp_w + 2 * kReplayFramePad,
-                                    disp_h + 2 * kReplayFramePad};
-            r.Panel(framebox, kReplayPanelRadius, SDL_Color{10, 12, 26, 220},
+            // Nie wychodz poza strefe nad HUD-em.
+            const int max_h = h - replay_y - bottom_reserved - lay.PH(0.05f);
+            if (disp_h > max_h && max_h > 0) {
+                disp_w = disp_w * max_h / disp_h;
+                disp_h = max_h;
+            }
+            const SDL_Rect framebox{col_cx - disp_w / 2 - frame_pad, replay_y - frame_pad,
+                                    disp_w + 2 * frame_pad, disp_h + 2 * frame_pad};
+            r.Panel(framebox, lay.PM(0.015f), SDL_Color{10, 12, 26, 220},
                     SDL_Color{90, 100, 180, 200});
-            SDL_Rect dst{kLeftCenterX - disp_w / 2, kReplayY, disp_w, disp_h};
+            SDL_Rect dst{col_cx - disp_w / 2, replay_y, disp_w, disp_h};
             r.DrawTexture(frame, dst);
+            replay_bottom = replay_y + disp_h;
         }
     }
 
-    r.DrawText("ZAGRAJ JESZCZE RAZ!", ui::FontSize::Normal, SDL_Color{120, 210, 255, 255},
-               kLeftCenterX, r.height() - kReplayHintYFromBottom, true, 255, 1.0f, 2);
+    const int hint_y = h - lay.PH(lay.IsPortrait() ? 0.155f : 0.14f);
+    if (lay.IsPortrait()) {
+        // Ranking pod replayem; zostaw miejsce na napis nad strefa HUD.
+        board_area.y = replay_bottom + lay.PH(0.03f);
+        board_area.h = hint_y - lay.PH(0.01f) - board_area.y;
+    }
+    board_.Render(r, ctx.leaderboard, board_area);
 
-    board_.Render(r, ctx.leaderboard);
+    r.DrawText("ZAGRAJ JESZCZE RAZ!", ui::FontSize::Normal, SDL_Color{120, 210, 255, 255},
+               col_cx, hint_y, true, 255, 1.0f, 2);
+
     ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard);
     scroll_.Render(r, "Boxer Video  --  GRATULACJE  --  HIT HARDER!  --  PLAY WITH ME  --  ");
 

@@ -14,7 +14,11 @@ public:
 
     // body_path: font dla tekstu (Small/Normal). heading_path: font dla naglowkow
     // (Large/Huge); pusty => uzywany jest body_path.
-    bool Load(const std::string& body_path, const std::string& heading_path = "");
+    // base_dim: min(design_w, design_h); rozmiary fontow to frakcje tego wymiaru,
+    // dzieki czemu proporcje tekstu sa identyczne na FullHD i 4K. base_dim <= 0
+    // uzywa domyslnej bazy 1080.
+    bool Load(const std::string& body_path, const std::string& heading_path = "",
+              int base_dim = 0);
     void Unload();
 
     TTF_Font* Get(FontSize size) const;

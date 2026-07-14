@@ -2,15 +2,17 @@
 
 #include "ui/Renderer.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace ui::widgets {
 
 namespace {
 
-constexpr int kBarHeight = 116;
-constexpr int kAccentHeight = 4;
-constexpr int kTitleY = 14;
+// Frakcje wysokosci ekranu: pasek jest nizszy w pionie (ekran jest wyzszy).
+constexpr float kBarFracPortrait = 0.08f;
+constexpr float kBarFracLandscape = 0.11f;
+constexpr float kAccentFrac = 0.004f;
 
 }  // namespace
 
@@ -41,24 +43,35 @@ SDL_Color AccentColor(Uint32 elapsed_ms) {
     return SDL_Color{r, g, b, 255};
 }
 
-void RenderHeader(ui::Renderer& renderer) {
-    const Uint32 elapsed = renderer.ticks();
-    const int w = renderer.width();
+int HeaderHeight(ui::Renderer& renderer) {
+    const ui::Layout& lay = renderer.layout();
+    return lay.PH(lay.IsPortrait() ? kBarFracPortrait : kBarFracLandscape);
+}
 
-    renderer.FillRect(SDL_Rect{0, 0, w, kBarHeight}, SDL_Color{20, 22, 44, 235});
+int RenderHeader(ui::Renderer& renderer) {
+    const Uint32 elapsed = renderer.ticks();
+    const ui::Layout& lay = renderer.layout();
+    const int w = renderer.width();
+    const int bar_h = HeaderHeight(renderer);
+    const int accent_h = std::max(2, lay.PH(kAccentFrac));
+    const int shadow = std::max(1, lay.PM(0.003f));
+
+    renderer.FillRect(SDL_Rect{0, 0, w, bar_h}, SDL_Color{20, 22, 44, 235});
     SDL_Color accent = AccentColor(elapsed);
-    renderer.FillRect(SDL_Rect{0, kBarHeight - kAccentHeight, w, kAccentHeight}, accent);
+    renderer.FillRect(SDL_Rect{0, bar_h - accent_h, w, accent_h}, accent);
 
     const std::string a = "Boxer ";
     const std::string b = "Video";
     SDL_Point wa = renderer.MeasureText(a, ui::FontSize::Large);
     SDL_Point wb = renderer.MeasureText(b, ui::FontSize::Large);
     const int total = wa.x + wb.x;
-    const int start_x = renderer.layout().CenterX() - total / 2;
-    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, start_x, kTitleY,
-                      false, 255, 1.0f, 3);
-    renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, kTitleY, false, 255, 1.0f,
-                      3);
+    const int start_x = lay.CenterX() - total / 2;
+    const int title_y = (bar_h - accent_h - wa.y) / 2;
+    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, start_x, title_y,
+                      false, 255, 1.0f, shadow);
+    renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, title_y, false, 255, 1.0f,
+                      shadow);
+    return bar_h;
 }
 
 }  // namespace ui::widgets

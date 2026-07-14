@@ -23,6 +23,16 @@ struct Layout {
     int CenterY() const { return design_h / 2; }
     float FontScale() const { return scale; }
 
+    // Orientacja design-space (monitor docelowy jest pionowy).
+    bool IsPortrait() const { return design_h > design_w; }
+    int MinDim() const { return design_w < design_h ? design_w : design_h; }
+
+    // Helpery procentowe (frakcje 0..1 w design-space).
+    int PW(float frac) const;  // frac * design_w
+    int PH(float frac) const;  // frac * design_h
+    int PM(float frac) const;  // frac * min(design_w, design_h) - pady, promienie, ikony
+    SDL_Rect PRect(float x, float y, float w, float h) const;  // wszystko we frakcjach
+
     int X(int design_px) const;
     int Y(int design_px) const;
     int S(int design_px) const;
