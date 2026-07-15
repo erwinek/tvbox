@@ -9,7 +9,7 @@ namespace ui::widgets {
 namespace {
 
 // Frakcje min-wymiaru ekranu — spojne proporcje na FullHD i 4K.
-constexpr float kRowHFrac = 0.054f;
+constexpr float kRowHFrac = 0.068f;
 constexpr float kTitlePadFrac = 0.015f;
 constexpr float kRowPadXFrac = 0.011f;
 constexpr float kRankXFrac = 0.015f;
@@ -43,7 +43,7 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
 
     const ui::Layout& lay = renderer.layout();
     const int row_h = std::max(1, lay.PM(kRowHFrac));
-    const int thumb_h = row_h * 4 / 5;
+    const int thumb_h = row_h * 9 / 10;
     const int thumb_w = thumb_h * 4 / 3;
     const int title_pad = lay.PM(kTitlePadFrac);
     const int title_h = renderer.MeasureText("TOP SCORES", ui::FontSize::Normal).y;

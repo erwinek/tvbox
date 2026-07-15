@@ -96,10 +96,10 @@ void AttractScreen::Render(core::AppContext& ctx) {
         panel = SDL_Rect{lay.CenterX() - panel_w / 2, panel_y, panel_w, panel_h};
 
         const int board_y = panel_y + panel_h + lay.PH(0.025f);
-        board_area = SDL_Rect{lay.PW(0.05f), board_y, lay.PW(0.90f),
+        board_area = SDL_Rect{lay.PW(0.03f), board_y, lay.PW(0.94f),
                               h - board_y - bottom_reserved};
     } else {
-        const int board_w = lay.PW(0.30f);
+        const int board_w = lay.PW(0.34f);
         const int board_y = header_h + lay.PH(0.04f);
         board_area = SDL_Rect{w - board_w - lay.PW(0.02f), board_y, board_w,
                               h - board_y - bottom_reserved};

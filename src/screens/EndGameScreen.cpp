@@ -8,6 +8,7 @@
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace screens {
@@ -66,28 +67,47 @@ void EndGameScreen::Render(core::AppContext& ctx) {
     SDL_Rect board_area;
     if (lay.IsPortrait()) {
         col_cx = lay.CenterX();
-        board_area = SDL_Rect{lay.PW(0.05f), 0, lay.PW(0.90f), 0};  // y/h uzupelnione nizej
+        board_area = SDL_Rect{lay.PW(0.03f), 0, lay.PW(0.94f), 0};  // y/h uzupelnione nizej
     } else {
-        const int board_w = lay.PW(0.30f);
+        const int board_w = lay.PW(0.34f);
         const int board_y = header_h + lay.PH(0.04f);
         board_area = SDL_Rect{w - board_w - lay.PW(0.02f), board_y, board_w,
                               h - board_y - bottom_reserved};
         col_cx = (w - board_w - lay.PW(0.02f)) / 2;
     }
 
-    const int panel_w = lay.IsPortrait() ? lay.PW(0.72f) : lay.PW(0.30f);
-    const int panel_h = lay.PH(lay.IsPortrait() ? 0.15f : 0.22f);
+    const int panel_w = lay.IsPortrait() ? lay.PW(0.82f) : lay.PW(0.36f);
+    const int panel_h = lay.PH(lay.IsPortrait() ? 0.20f : 0.28f);
     const int panel_y = header_h + lay.PH(0.025f);
     const SDL_Rect score_panel{col_cx - panel_w / 2, panel_y, panel_w, panel_h};
     r.Panel(score_panel, lay.PM(0.024f), SDL_Color{18, 20, 40, 130}, SDL_Color{90, 100, 170, 160});
 
-    r.DrawText("GRATULACJE!", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, col_cx,
-               panel_y + lay.PH(0.015f), true, 255, 1.0f, 3);
+    const int pad_y = lay.PH(0.014f);
+    const int pad_x = lay.PM(0.025f);
+    const int title_y = panel_y + pad_y;
+    r.DrawText("GRATULACJE!", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, col_cx, title_y,
+               true, 255, 1.0f, 3);
 
-    float scale_pulse = 1.6f + 0.2f * std::sin(static_cast<float>(elapsed) * 0.005f);
-    r.DrawText(std::to_string(ctx.session->score()), ui::FontSize::Huge,
-               SDL_Color{255, 230, 80, 255}, col_cx, panel_y + lay.PH(0.075f), true, 255,
-               scale_pulse, 5);
+    // Wynik skalowany do panelu — duza, efekciarska skala, ale bez wychodzenia poza ramke.
+    const std::string score_text = std::to_string(ctx.session->score());
+    const SDL_Point title_sz = r.MeasureText("GRATULACJE!", ui::FontSize::Large);
+    const SDL_Point score_sz = r.MeasureText(score_text, ui::FontSize::Huge);
+    const int gap = lay.PH(0.01f);
+    const int avail_w = std::max(1, panel_w - 2 * pad_x);
+    const int avail_h = std::max(1, panel_h - pad_y - title_sz.y - gap - pad_y);
+    float fit_scale = 1.6f;
+    if (score_sz.x > 0 && score_sz.y > 0) {
+        const float max_fit =
+            std::min(static_cast<float>(avail_w) / static_cast<float>(score_sz.x),
+                     static_cast<float>(avail_h) / static_cast<float>(score_sz.y));
+        fit_scale = std::min(1.8f, max_fit);
+    }
+    const float pulse = 0.08f * std::sin(static_cast<float>(elapsed) * 0.005f);
+    const float score_scale = fit_scale * (1.0f + pulse);
+    const int score_h = static_cast<int>(score_sz.y * score_scale);
+    const int score_y = title_y + title_sz.y + gap + (avail_h - score_h) / 2;
+    r.DrawText(score_text, ui::FontSize::Huge, SDL_Color{255, 230, 80, 255}, col_cx, score_y, true,
+               255, score_scale, 5);
 
     int replay_bottom = score_panel.y + score_panel.h;
 
@@ -132,8 +152,8 @@ void EndGameScreen::Render(core::AppContext& ctx) {
     const int hint_y = h - lay.PH(lay.IsPortrait() ? 0.155f : 0.14f);
     if (lay.IsPortrait()) {
         // Ranking pod replayem; zostaw miejsce na napis nad strefa HUD.
-        board_area.y = replay_bottom + lay.PH(0.03f);
-        board_area.h = hint_y - lay.PH(0.01f) - board_area.y;
+        board_area.y = replay_bottom + lay.PH(0.02f);
+        board_area.h = hint_y - lay.PH(0.005f) - board_area.y;
     }
     board_.Render(r, ctx.leaderboard, board_area);
 
