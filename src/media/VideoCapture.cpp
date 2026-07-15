@@ -1,9 +1,10 @@
 #include "media/VideoCapture.h"
 
+#include "core/Clock.h"
 #include "util/Logger.h"
 
 #include <array>
-#include <cstdio>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -14,9 +15,11 @@
 #include <io.h>
 #define TVBOX_POPEN _popen
 #define TVBOX_PCLOSE _pclose
+#define TVBOX_POPEN_MODE "rb"
 #else
 #define TVBOX_POPEN popen
 #define TVBOX_PCLOSE pclose
+#define TVBOX_POPEN_MODE "r"
 #endif
 
 namespace media {
@@ -161,7 +164,29 @@ void ReplaceAll(std::string& text, const std::string& key, const std::string& va
     }
 }
 
+void StripDurationFlag(std::string& cmd) {
+    for (;;) {
+        const auto pos = cmd.find("-t ");
+        if (pos == std::string::npos) {
+            break;
+        }
+        std::size_t end = pos + 3;
+        while (end < cmd.size() && cmd[end] == ' ') {
+            ++end;
+        }
+        while (end < cmd.size() &&
+               (std::isdigit(static_cast<unsigned char>(cmd[end])) || cmd[end] == '.')) {
+            ++end;
+        }
+        cmd.erase(pos, end - pos);
+    }
+}
+
 }  // namespace
+
+VideoCapture::~VideoCapture() {
+    StopRingBufferCapture();
+}
 
 void VideoCapture::SetCommandTemplate(const std::string& command) {
     command_template_ = command;
@@ -216,6 +241,30 @@ std::string VideoCapture::BuildCommand(const std::string& output_path, int durat
     return cmd;
 }
 
+std::string VideoCapture::BuildRingBufferCommand() const {
+    std::string cmd = command_template_;
+    if (cmd.find("{camera}") != std::string::npos) {
+        cmd = ResolveCommandTemplate(cmd);
+    }
+    ReplaceAll(cmd, "{output}", "pipe:1");
+    ReplaceAll(cmd, "{duration_ms}", "");
+    StripDurationFlag(cmd);
+
+    if (cmd.find("pipe:1") == std::string::npos && cmd.find("pipe:0") == std::string::npos) {
+        if (cmd.find("-f mpegts") == std::string::npos) {
+            cmd += " -f mpegts pipe:1";
+        } else {
+            cmd += " pipe:1";
+        }
+    }
+
+    const std::string null_dev = NullDevice();
+    if (cmd.find("2>") == std::string::npos && cmd.find("2>>") == std::string::npos) {
+        cmd += " 2>" + null_dev;
+    }
+    return cmd;
+}
+
 bool VideoCapture::CaptureClip(const std::string& output_path, int duration_ms) const {
     if (command_template_.empty()) {
         util::Log(util::LogLevel::Warn, "VideoCapture: camera_command is empty");
@@ -228,6 +277,148 @@ bool VideoCapture::CaptureClip(const std::string& output_path, int duration_ms) 
         util::Log(util::LogLevel::Warn, "VideoCapture: command failed with code " + std::to_string(result));
     }
     return result == 0;
+}
+
+void VideoCapture::PruneBuffer() {
+    if (buffer_.size() <= 1) {
+        return;
+    }
+    const long long newest = buffer_.back().timestamp_ms;
+    while (buffer_.size() > 1 && newest - buffer_.front().timestamp_ms > buffer_duration_ms_) {
+        buffer_.pop_front();
+    }
+}
+
+void VideoCapture::ReaderLoop() {
+    std::array<char, 65536> read_buf{};
+    while (!stop_requested_.load()) {
+        if (!ffmpeg_pipe_) {
+            break;
+        }
+        const std::size_t n = fread(read_buf.data(), 1, read_buf.size(), ffmpeg_pipe_);
+        if (n == 0) {
+            break;
+        }
+        const long long ts = core::NowMs();
+        Chunk chunk;
+        chunk.timestamp_ms = ts;
+        chunk.data.assign(read_buf.begin(), read_buf.begin() + static_cast<std::ptrdiff_t>(n));
+        {
+            std::lock_guard lock(buffer_mutex_);
+            buffer_.push_back(std::move(chunk));
+            PruneBuffer();
+        }
+    }
+}
+
+bool VideoCapture::StartRingBufferCapture(int buffer_duration_ms) {
+    if (command_template_.empty()) {
+        util::Log(util::LogLevel::Warn, "VideoCapture: camera_command is empty");
+        return false;
+    }
+    StopRingBufferCapture();
+
+    buffer_duration_ms_ = buffer_duration_ms;
+    stop_requested_ = false;
+
+    const std::string cmd = BuildRingBufferCommand();
+    util::Log(util::LogLevel::Info, "VideoCapture ring buffer: " + cmd);
+
+    ffmpeg_pipe_ = TVBOX_POPEN(cmd.c_str(), TVBOX_POPEN_MODE);
+    if (!ffmpeg_pipe_) {
+        util::Log(util::LogLevel::Warn, "VideoCapture: failed to start ffmpeg pipe");
+        return false;
+    }
+
+    active_ = true;
+    reader_thread_ = std::thread(&VideoCapture::ReaderLoop, this);
+    return true;
+}
+
+void VideoCapture::StopRingBufferCapture() {
+    if (!active_.load() && !reader_thread_.joinable() && ffmpeg_pipe_ == nullptr) {
+        return;
+    }
+
+    stop_requested_ = true;
+    if (reader_thread_.joinable()) {
+        reader_thread_.join();
+    }
+    if (ffmpeg_pipe_) {
+        TVBOX_PCLOSE(ffmpeg_pipe_);
+        ffmpeg_pipe_ = nullptr;
+    }
+
+    {
+        std::lock_guard lock(buffer_mutex_);
+        buffer_.clear();
+    }
+
+    active_ = false;
+    stop_requested_ = false;
+}
+
+bool VideoCapture::FinalizeRingBuffer(const std::string& output_path) {
+    if (!active_.load()) {
+        util::Log(util::LogLevel::Warn, "VideoCapture: finalize called but ring buffer inactive");
+        return false;
+    }
+
+    stop_requested_ = true;
+    if (reader_thread_.joinable()) {
+        reader_thread_.join();
+    }
+    if (ffmpeg_pipe_) {
+        TVBOX_PCLOSE(ffmpeg_pipe_);
+        ffmpeg_pipe_ = nullptr;
+    }
+
+    std::deque<Chunk> snapshot;
+    {
+        std::lock_guard lock(buffer_mutex_);
+        snapshot = std::move(buffer_);
+        buffer_.clear();
+    }
+
+    active_ = false;
+    stop_requested_ = false;
+
+    if (snapshot.empty()) {
+        util::Log(util::LogLevel::Warn, "VideoCapture: ring buffer empty, nothing to save");
+        return false;
+    }
+
+    const std::string temp_ts = output_path + ".tmp.ts";
+    {
+        std::ofstream out(temp_ts, std::ios::binary);
+        if (!out.is_open()) {
+            util::Log(util::LogLevel::Warn, "VideoCapture: cannot write temp ts " + temp_ts);
+            return false;
+        }
+        for (const auto& chunk : snapshot) {
+            out.write(reinterpret_cast<const char*>(chunk.data.data()),
+                      static_cast<std::streamsize>(chunk.data.size()));
+        }
+    }
+
+    const std::string null_dev = NullDevice();
+    const std::string remux_cmd =
+        "ffmpeg -y -i \"" + temp_ts + "\" -c copy \"" + output_path + "\" 2>" + null_dev;
+    util::Log(util::LogLevel::Info, "VideoCapture: " + remux_cmd);
+    const int result = std::system(remux_cmd.c_str());
+    std::error_code ec;
+    std::filesystem::remove(temp_ts, ec);
+
+    // Nieudany remux zostawia pusty/uszkodzony plik — usun, zeby UI nie widzialo go jako klipu.
+    const bool empty_output =
+        !std::filesystem::exists(output_path, ec) || std::filesystem::file_size(output_path, ec) == 0;
+    if (result != 0 || empty_output) {
+        std::filesystem::remove(output_path, ec);
+        util::Log(util::LogLevel::Warn, "VideoCapture: remux failed with code " + std::to_string(result));
+        return false;
+    }
+    util::Log(util::LogLevel::Info, "VideoCapture: saved " + output_path);
+    return true;
 }
 
 std::string VideoCapture::ThumbPathFor(const std::string& video_path) {

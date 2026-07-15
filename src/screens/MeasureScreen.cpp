@@ -14,12 +14,21 @@
 namespace screens {
 
 void MeasureScreen::OnEnter(core::AppContext& ctx) {
-    (void)ctx;
     counting_ = false;
     target_score_ = 0;
     display_ = 0.0;
     elapsed_ms_ = 0.0;
     idle_ms_ = 0.0;
+
+    if (ctx.start_measure_recording) {
+        ctx.start_measure_recording();
+    }
+}
+
+void MeasureScreen::OnExit(core::AppContext& ctx) {
+    if (ctx.cancel_measure_recording) {
+        ctx.cancel_measure_recording();
+    }
 }
 
 std::optional<core::GameState> MeasureScreen::HandleEvent(const core::InputEvent& event,

@@ -29,7 +29,10 @@ public:
 private:
     void RegisterScreens();
     void CommitScore(const std::string& player_id, int score);
-    void CaptureVideoAsync(const std::string& video_path);
+    void StartMeasureRecording();
+    void ScheduleHitRecordingFinalize(const std::string& video_path);
+    void CancelMeasureRecording();
+    void PollRecordingFinalize();
     void RefreshLeaderboard();
 
     config::Config cfg_;
@@ -50,6 +53,9 @@ private:
     std::atomic<bool> recording_{false};
     std::atomic<bool> leaderboard_dirty_{false};
     long long last_sync_ms_ = 0;
+    long long finalize_at_ms_ = 0;
+    std::string pending_video_path_;
+    bool hit_finalize_scheduled_ = false;
     std::thread capture_thread_;
 };
 

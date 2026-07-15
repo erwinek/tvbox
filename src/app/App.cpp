@@ -87,6 +87,8 @@ bool App::Init() {
     ctx_.commit_score = [this](const std::string& player, int score) {
         CommitScore(player, score);
     };
+    ctx_.start_measure_recording = [this]() { StartMeasureRecording(); };
+    ctx_.cancel_measure_recording = [this]() { CancelMeasureRecording(); };
 
     RegisterScreens();
 
@@ -147,12 +149,15 @@ void App::Run() {
             last_sync_ms_ = now;
         }
 
-        // 5) Odswiezenie rankingu po zakonczeniu nagrywania w tle.
+        // 5) Finalizacja nagrania po uderzeniu (bufor RAM + 1s opoznienia).
+        PollRecordingFinalize();
+
+        // 6) Odswiezenie rankingu po zakonczeniu nagrywania w tle.
         if (leaderboard_dirty_.exchange(false)) {
             RefreshLeaderboard();
         }
 
-        // 6) Render aktywnego ekranu.
+        // 7) Render aktywnego ekranu.
         fsm_.Render(ctx_);
 
         SDL_Delay(16);
@@ -168,7 +173,7 @@ void App::CommitScore(const std::string& player_id, int score) {
     if (!cfg_.camera_command.empty()) {
         const std::string filename = "hit_" + std::to_string(ts) + ".mp4";
         video_path = cfg_.video_dir + "/" + filename;
-        CaptureVideoAsync(video_path);
+        ScheduleHitRecordingFinalize(video_path);
     }
 
     store::ScoreEntry entry{};
@@ -182,25 +187,75 @@ void App::CommitScore(const std::string& player_id, int score) {
     RefreshLeaderboard();
 }
 
-void App::CaptureVideoAsync(const std::string& video_path) {
+void App::StartMeasureRecording() {
+    if (cfg_.camera_command.empty()) {
+        return;
+    }
     if (capture_thread_.joinable()) {
         capture_thread_.join();
     }
-    recording_ = true;
+    hit_finalize_scheduled_ = false;
+    finalize_at_ms_ = 0;
+    pending_video_path_.clear();
+
+    const bool ok = video_.StartRingBufferCapture(cfg_.camera_duration_ms);
+    recording_ = ok;
+    if (ok) {
+        util::Log(util::LogLevel::Info, "Measure recording buffer started");
+    }
+}
+
+void App::ScheduleHitRecordingFinalize(const std::string& video_path) {
+    pending_video_path_ = video_path;
+    finalize_at_ms_ = core::NowMs() + cfg_.camera_post_hit_ms;
+    hit_finalize_scheduled_ = true;
+    util::Log(util::LogLevel::Info,
+              "Hit recording finalize scheduled in " + std::to_string(cfg_.camera_post_hit_ms) + "ms");
+}
+
+void App::CancelMeasureRecording() {
+    if (hit_finalize_scheduled_) {
+        return;
+    }
+    video_.StopRingBufferCapture();
+    recording_ = false;
+    finalize_at_ms_ = 0;
+    pending_video_path_.clear();
+    util::Log(util::LogLevel::Info, "Measure recording cancelled");
+}
+
+void App::PollRecordingFinalize() {
+    if (finalize_at_ms_ == 0) {
+        return;
+    }
+    if (core::NowMs() < finalize_at_ms_) {
+        return;
+    }
+
+    finalize_at_ms_ = 0;
+    const std::string video_path = pending_video_path_;
+    pending_video_path_.clear();
+
+    if (capture_thread_.joinable()) {
+        capture_thread_.join();
+    }
+
     capture_thread_ = std::thread([this, video_path]() {
-        util::Log(util::LogLevel::Info, "Recording started: " + video_path);
-        const bool ok = video_.CaptureClip(video_path, cfg_.camera_duration_ms);
+        recording_ = true;
+        util::Log(util::LogLevel::Info, "Finalizing hit recording: " + video_path);
+        const bool ok = video_.FinalizeRingBuffer(video_path);
         if (ok) {
             util::Log(util::LogLevel::Info, "Recording saved: " + video_path);
             const std::string thumb = media::VideoCapture::ThumbPathFor(video_path);
             media::VideoCapture::ExtractThumbnail(video_path, thumb);
             const std::string frames_dir = media::VideoCapture::FramesDirFor(video_path);
             media::VideoCapture::ExtractFrames(video_path, frames_dir, 10);
-            leaderboard_dirty_ = true;  // odswiezenie wykona watek glowny
+            leaderboard_dirty_ = true;
         } else {
             util::Log(util::LogLevel::Warn, "Recording failed: " + video_path);
         }
         recording_ = false;
+        hit_finalize_scheduled_ = false;
     });
 }
 

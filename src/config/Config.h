@@ -31,6 +31,7 @@ struct Config {
     std::string db_path = "data/leaderboard.db";
     std::string video_dir = "data/videos";
     int camera_duration_ms = 4000;
+    int camera_post_hit_ms = 1000;
     std::string camera_command;
 
     std::string server_url;

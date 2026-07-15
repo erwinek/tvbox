@@ -126,6 +126,7 @@ Config LoadConfig(const std::string& path) {
     if (map.count("db_path")) cfg.db_path = map["db_path"];
     if (map.count("video_dir")) cfg.video_dir = map["video_dir"];
     if (map.count("camera_duration_ms")) cfg.camera_duration_ms = std::stoi(map["camera_duration_ms"]);
+    if (map.count("camera_post_hit_ms")) cfg.camera_post_hit_ms = std::stoi(map["camera_post_hit_ms"]);
     if (map.count("camera_command")) cfg.camera_command = map["camera_command"];
     if (map.count("server_url")) cfg.server_url = map["server_url"];
     if (map.count("auth_token")) cfg.auth_token = map["auth_token"];

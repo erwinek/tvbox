@@ -41,6 +41,8 @@ struct AppContext {
     // Akcje delegowane do App (utrzymuja ekrany niezalezne od szczegolow App).
     std::function<void()> refresh_leaderboard;
     std::function<void(const std::string& player_id, int score)> commit_score;
+    std::function<void()> start_measure_recording;
+    std::function<void()> cancel_measure_recording;
 };
 
 }  // namespace core

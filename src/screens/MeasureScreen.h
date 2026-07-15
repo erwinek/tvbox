@@ -8,6 +8,7 @@ namespace screens {
 class MeasureScreen : public core::Screen {
 public:
     void OnEnter(core::AppContext& ctx) override;
+    void OnExit(core::AppContext& ctx) override;
     std::optional<core::GameState> HandleEvent(const core::InputEvent& event,
                                                core::AppContext& ctx) override;
     std::optional<core::GameState> Update(core::AppContext& ctx, double dt_ms) override;
