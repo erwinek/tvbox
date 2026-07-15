@@ -10,6 +10,7 @@
 #include "media/VideoCapture.h"
 #include "store/LeaderboardStore.h"
 #include "sync/SyncClient.h"
+#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 
 #include <atomic>
@@ -38,6 +39,7 @@ private:
     config::Config cfg_;
 
     ui::Renderer renderer_;
+    ui::BackgroundPlayer background_;
     media::AudioPlayer audio_;
     media::VideoCapture video_;
     store::LeaderboardStore store_;

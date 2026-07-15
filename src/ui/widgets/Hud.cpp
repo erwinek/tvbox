@@ -32,8 +32,8 @@ void PillAt(ui::Renderer& r, int x, int bottom_y, const std::string& label, cons
     const int pill_w = sz.x + 2 * pad;
     const int y = bottom_y - pill_h;
 
-    r.Panel(SDL_Rect{x, y, pill_w, pill_h}, lay.PM(kRadiusFrac), SDL_Color{16, 18, 38, 210},
-            SDL_Color{80, 90, 160, 170});
+    r.Panel(SDL_Rect{x, y, pill_w, pill_h}, lay.PM(kRadiusFrac), SDL_Color{16, 18, 38, 145},
+            SDL_Color{80, 90, 160, 160});
 
     const int ty = y + (pill_h - sz.y) / 2;
     SDL_Point lw = r.MeasureText(label, ui::FontSize::Small);

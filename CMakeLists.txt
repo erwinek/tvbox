@@ -20,6 +20,7 @@ set(TVBOX_SOURCES
     src/ui/FontManager.cpp
     src/ui/TextureCache.cpp
     src/ui/FrameSequencePlayer.cpp
+    src/ui/BackgroundPlayer.cpp
     src/ui/widgets/Header.cpp
     src/ui/widgets/ScrollBar.cpp
     src/ui/widgets/LeaderboardWidget.cpp

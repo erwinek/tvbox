@@ -11,6 +11,7 @@ struct Config;
 }
 namespace ui {
 class Renderer;
+class BackgroundPlayer;
 }
 namespace media {
 class AudioPlayer;
@@ -30,6 +31,7 @@ namespace core {
 struct AppContext {
     const config::Config* config = nullptr;
     ui::Renderer* renderer = nullptr;
+    ui::BackgroundPlayer* background = nullptr;
     media::AudioPlayer* audio = nullptr;
     media::VideoCapture* video = nullptr;
     store::LeaderboardStore* store = nullptr;

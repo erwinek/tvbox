@@ -3,6 +3,7 @@
 #include "core/AppContext.h"
 #include "game/GameSession.h"
 #include "media/AudioPlayer.h"
+#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
@@ -53,7 +54,9 @@ void EndGameScreen::Render(core::AppContext& ctx) {
     const int h = r.height();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
-    r.DrawVerticalGradient(SDL_Color{24, 30, 56, 255}, SDL_Color{6, 7, 16, 255});
+    const bool has_bg = ctx.background && ctx.background->Render(r);
+    const Uint8 grad_a = has_bg ? 170 : 255;
+    r.DrawVerticalGradient(SDL_Color{24, 30, 56, grad_a}, SDL_Color{6, 7, 16, grad_a});
     const int header_h = ui::widgets::RenderHeader(r);
     const int bottom_reserved = lay.PH(0.12f);  // HUD + scrollbar
 
@@ -76,7 +79,7 @@ void EndGameScreen::Render(core::AppContext& ctx) {
     const int panel_h = lay.PH(lay.IsPortrait() ? 0.15f : 0.22f);
     const int panel_y = header_h + lay.PH(0.025f);
     const SDL_Rect score_panel{col_cx - panel_w / 2, panel_y, panel_w, panel_h};
-    r.Panel(score_panel, lay.PM(0.024f), SDL_Color{18, 20, 40, 190}, SDL_Color{90, 100, 170, 170});
+    r.Panel(score_panel, lay.PM(0.024f), SDL_Color{18, 20, 40, 130}, SDL_Color{90, 100, 170, 160});
 
     r.DrawText("GRATULACJE!", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, col_cx,
                panel_y + lay.PH(0.015f), true, 255, 1.0f, 3);
@@ -118,8 +121,8 @@ void EndGameScreen::Render(core::AppContext& ctx) {
             }
             const SDL_Rect framebox{col_cx - disp_w / 2 - frame_pad, replay_y - frame_pad,
                                     disp_w + 2 * frame_pad, disp_h + 2 * frame_pad};
-            r.Panel(framebox, lay.PM(0.015f), SDL_Color{10, 12, 26, 220},
-                    SDL_Color{90, 100, 180, 200});
+            r.Panel(framebox, lay.PM(0.015f), SDL_Color{10, 12, 26, 160},
+                    SDL_Color{90, 100, 180, 190});
             SDL_Rect dst{col_cx - disp_w / 2, replay_y, disp_w, disp_h};
             r.DrawTexture(frame, dst);
             replay_bottom = replay_y + disp_h;

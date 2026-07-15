@@ -58,7 +58,7 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
     const int board_h = rows_start + rows * row_h + title_pad;
 
     renderer.Panel(SDL_Rect{area.x, area.y, area.w, board_h}, lay.PM(kRadiusFrac),
-                   SDL_Color{16, 18, 38, 210}, SDL_Color{70, 80, 150, 160});
+                   SDL_Color{16, 18, 38, 145}, SDL_Color{70, 80, 150, 150});
 
     renderer.DrawText("TOP SCORES", ui::FontSize::Normal, SDL_Color{255, 215, 0, 255},
                       area.x + area.w / 2, area.y + title_pad, true, 255, 1.0f, 2);

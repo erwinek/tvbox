@@ -132,7 +132,8 @@ void Renderer::DrawVerticalGradient(SDL_Color top, SDL_Color bottom) {
         const Uint8 r = static_cast<Uint8>(top.r + (bottom.r - top.r) * t);
         const Uint8 g = static_cast<Uint8>(top.g + (bottom.g - top.g) * t);
         const Uint8 b = static_cast<Uint8>(top.b + (bottom.b - top.b) * t);
-        SDL_SetRenderDrawColor(renderer_, r, g, b, 255);
+        const Uint8 a = static_cast<Uint8>(top.a + (bottom.a - top.a) * t);
+        SDL_SetRenderDrawColor(renderer_, r, g, b, a);
         SDL_RenderDrawLine(renderer_, 0, y, layout_.actual_w, y);
     }
 }

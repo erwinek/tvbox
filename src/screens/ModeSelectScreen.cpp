@@ -3,6 +3,7 @@
 #include "core/AppContext.h"
 #include "game/GameSession.h"
 #include "media/AudioPlayer.h"
+#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
@@ -57,7 +58,9 @@ void ModeSelectScreen::Render(core::AppContext& ctx) {
     const int cx = lay.CenterX();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
-    r.DrawVerticalGradient(SDL_Color{30, 24, 56, 255}, SDL_Color{8, 6, 16, 255});
+    const bool has_bg = ctx.background && ctx.background->Render(r);
+    const Uint8 grad_a = has_bg ? 170 : 255;
+    r.DrawVerticalGradient(SDL_Color{30, 24, 56, grad_a}, SDL_Color{8, 6, 16, grad_a});
     const int header_h = ui::widgets::RenderHeader(r);
 
     const int title_y = header_h + lay.PH(0.05f);
@@ -77,9 +80,9 @@ void ModeSelectScreen::Render(core::AppContext& ctx) {
         const bool active = (i == selected);
         const SDL_Rect btn{cx - btn_w / 2, y, btn_w, btn_h};
         if (active) {
-            r.Panel(btn, lay.PM(0.019f), SDL_Color{40, 90, 60, 220}, SDL_Color{100, 255, 150, 220});
+            r.Panel(btn, lay.PM(0.019f), SDL_Color{40, 90, 60, 165}, SDL_Color{100, 255, 150, 210});
         } else {
-            r.Panel(btn, lay.PM(0.019f), SDL_Color{22, 24, 46, 170}, SDL_Color{70, 80, 150, 130});
+            r.Panel(btn, lay.PM(0.019f), SDL_Color{22, 24, 46, 110}, SDL_Color{70, 80, 150, 120});
         }
         SDL_Color color = active ? SDL_Color{180, 255, 200, 255} : SDL_Color{180, 185, 205, 255};
         const int label_h = r.MeasureText(modes[i].name, ui::FontSize::Large).y;

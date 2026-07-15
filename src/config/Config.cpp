@@ -125,6 +125,7 @@ Config LoadConfig(const std::string& path) {
     if (map.count("font_path_heading")) cfg.font_path_heading = map["font_path_heading"];
     if (map.count("db_path")) cfg.db_path = map["db_path"];
     if (map.count("video_dir")) cfg.video_dir = map["video_dir"];
+    if (map.count("background_dir")) cfg.background_dir = map["background_dir"];
     if (map.count("camera_duration_ms")) cfg.camera_duration_ms = std::stoi(map["camera_duration_ms"]);
     if (map.count("camera_post_hit_ms")) cfg.camera_post_hit_ms = std::stoi(map["camera_post_hit_ms"]);
     if (map.count("camera_command")) cfg.camera_command = map["camera_command"];

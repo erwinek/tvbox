@@ -69,6 +69,7 @@ bool App::Init() {
 
     video_.SetCommandTemplate(media::VideoCapture::ResolveCommandTemplate(cfg_.camera_command));
     sync_.Configure(cfg_.server_url, cfg_.auth_token);
+    background_.Init(cfg_.background_dir);
 
     std::vector<game::GameMode> modes;
     for (const auto& m : cfg_.game_modes) {
@@ -79,6 +80,7 @@ bool App::Init() {
     // Kontekst dla ekranow.
     ctx_.config = &cfg_;
     ctx_.renderer = &renderer_;
+    ctx_.background = &background_;
     ctx_.audio = &audio_;
     ctx_.video = &video_;
     ctx_.store = &store_;

@@ -56,7 +56,7 @@ int RenderHeader(ui::Renderer& renderer) {
     const int accent_h = std::max(2, lay.PH(kAccentFrac));
     const int shadow = std::max(1, lay.PM(0.003f));
 
-    renderer.FillRect(SDL_Rect{0, 0, w, bar_h}, SDL_Color{20, 22, 44, 235});
+    renderer.FillRect(SDL_Rect{0, 0, w, bar_h}, SDL_Color{20, 22, 44, 190});
     SDL_Color accent = AccentColor(elapsed);
     renderer.FillRect(SDL_Rect{0, bar_h - accent_h, w, accent_h}, accent);
 
