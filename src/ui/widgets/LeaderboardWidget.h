@@ -16,9 +16,8 @@ class Renderer;
 namespace ui::widgets {
 
 // Panel rankingu TOP SCORES z animowanymi klipami / miniaturami.
-// Rysuje sie w obszarze `area` (design-space) podanym przez ekran; wysokosc
-// wierszy i miniatur jest liczona procentowo z rozmiaru ekranu, a liczba
-// wierszy ograniczana tak, by zmiescic sie w `area`.
+// Rysuje sie w obszarze `area` (design-space) podanym przez ekran.
+// Gdy wpisow jest wiecej niz miesci sie w `area`, lista auto-scrolluje.
 class LeaderboardWidget {
 public:
     void Render(ui::Renderer& renderer, const std::vector<ui::ScoreEntry>& entries,
@@ -27,8 +26,14 @@ public:
 
 private:
     ui::FrameSequencePlayer& GetClip(ui::Renderer& renderer, const std::string& frames_dir);
+    void UpdateScroll(int total_rows, int visible_rows, Uint32 now_ms);
 
     std::map<std::string, ui::FrameSequencePlayer> clips_;
+
+    float scroll_offset_ = 0.f;  // indeks pierwszego widocznego wiersza (moze byc ulamkowy)
+    int scroll_dir_ = 1;
+    Uint32 last_scroll_ms_ = 0;
+    Uint32 pause_until_ms_ = 0;
 };
 
 }  // namespace ui::widgets

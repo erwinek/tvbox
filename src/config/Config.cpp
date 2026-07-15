@@ -133,6 +133,8 @@ Config LoadConfig(const std::string& path) {
     if (map.count("auth_token")) cfg.auth_token = map["auth_token"];
     if (map.count("sync_enabled")) cfg.sync_enabled = ParseBool(map["sync_enabled"]);
     if (map.count("leaderboard_size")) cfg.leaderboard_size = std::stoi(map["leaderboard_size"]);
+    if (cfg.leaderboard_size < 10) cfg.leaderboard_size = 10;
+    if (cfg.leaderboard_size > 100) cfg.leaderboard_size = 100;
 
     if (map.count("game_modes")) cfg.game_modes = ParseModes(map["game_modes"]);
     if (cfg.game_modes.empty()) {

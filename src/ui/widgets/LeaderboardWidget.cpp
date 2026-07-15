@@ -3,6 +3,7 @@
 #include "ui/Renderer.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ui::widgets {
 
@@ -16,12 +17,19 @@ constexpr float kRankXFrac = 0.015f;
 constexpr float kRankColWFrac = 0.033f;
 constexpr float kScoreGapFrac = 0.011f;
 constexpr float kRadiusFrac = 0.022f;
-constexpr int kMaxRows = 10;
+
+// Auto-scroll: wiersze / sekunde oraz pauza na koncach (ms).
+constexpr float kScrollRowsPerSec = 0.55f;
+constexpr Uint32 kScrollPauseMs = 1600;
 
 }  // namespace
 
 void LeaderboardWidget::Invalidate() {
     clips_.clear();
+    scroll_offset_ = 0.f;
+    scroll_dir_ = 1;
+    last_scroll_ms_ = 0;
+    pause_until_ms_ = 0;
 }
 
 ui::FrameSequencePlayer& LeaderboardWidget::GetClip(ui::Renderer& renderer,
@@ -33,6 +41,44 @@ ui::FrameSequencePlayer& LeaderboardWidget::GetClip(ui::Renderer& renderer,
     ui::FrameSequencePlayer& player = clips_[frames_dir];
     player.Load(renderer.sdl(), frames_dir);
     return player;
+}
+
+void LeaderboardWidget::UpdateScroll(int total_rows, int visible_rows, Uint32 now_ms) {
+    if (total_rows <= visible_rows) {
+        scroll_offset_ = 0.f;
+        last_scroll_ms_ = now_ms;
+        return;
+    }
+
+    if (last_scroll_ms_ == 0) {
+        last_scroll_ms_ = now_ms;
+        pause_until_ms_ = now_ms + kScrollPauseMs;
+        return;
+    }
+
+    if (now_ms < pause_until_ms_) {
+        last_scroll_ms_ = now_ms;
+        return;
+    }
+
+    const float dt_s = static_cast<float>(now_ms - last_scroll_ms_) / 1000.f;
+    last_scroll_ms_ = now_ms;
+    if (dt_s <= 0.f || dt_s > 0.25f) {
+        return;
+    }
+
+    const float max_offset = static_cast<float>(total_rows - visible_rows);
+    scroll_offset_ += static_cast<float>(scroll_dir_) * kScrollRowsPerSec * dt_s;
+
+    if (scroll_offset_ <= 0.f) {
+        scroll_offset_ = 0.f;
+        scroll_dir_ = 1;
+        pause_until_ms_ = now_ms + kScrollPauseMs;
+    } else if (scroll_offset_ >= max_offset) {
+        scroll_offset_ = max_offset;
+        scroll_dir_ = -1;
+        pause_until_ms_ = now_ms + kScrollPauseMs;
+    }
 }
 
 void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::ScoreEntry>& entries,
@@ -49,14 +95,14 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
     const int title_h = renderer.MeasureText("TOP SCORES", ui::FontSize::Normal).y;
     const int rows_start = title_pad + title_h + title_pad;
 
-    // Tyle wierszy, ile miesci sie w przydzielonym obszarze (max 10).
+    const int total = static_cast<int>(entries.size());
     const int fit_rows = (area.h - rows_start - title_pad) / row_h;
-    const int rows = std::min({static_cast<int>(entries.size()), fit_rows, kMaxRows});
-    if (rows <= 0) {
+    const int visible = std::min(total, std::max(0, fit_rows));
+    if (visible <= 0) {
         return;
     }
-    const int board_h = rows_start + rows * row_h + title_pad;
 
+    const int board_h = rows_start + visible * row_h + title_pad;
     renderer.Panel(SDL_Rect{area.x, area.y, area.w, board_h}, lay.PM(kRadiusFrac),
                    SDL_Color{16, 18, 38, 145}, SDL_Color{70, 80, 150, 150});
 
@@ -64,15 +110,33 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
                       area.x + area.w / 2, area.y + title_pad, true, 255, 1.0f, 2);
 
     const Uint32 elapsed = renderer.ticks();
+    UpdateScroll(total, visible, elapsed);
+
     const int clip_fps = 10;
     const int row_pad_x = lay.PM(kRowPadXFrac);
     const int rank_x = lay.PM(kRankXFrac);
     const int rank_col_w = lay.PM(kRankColWFrac);
     const int score_gap = lay.PM(kScoreGapFrac);
 
-    int line = 0;
-    for (const auto& entry : entries) {
-        const int row_y = area.y + rows_start + line * row_h;
+    const int rows_y = area.y + rows_start;
+    const int rows_h = visible * row_h;
+    const SDL_Rect clip_design{area.x, rows_y, area.w, rows_h};
+    const SDL_Rect clip_screen = lay.Rect(clip_design.x, clip_design.y, clip_design.w, clip_design.h);
+    SDL_RenderSetClipRect(renderer.sdl(), &clip_screen);
+
+    const int first = static_cast<int>(std::floor(scroll_offset_));
+    const float frac = scroll_offset_ - static_cast<float>(first);
+    const int y_shift = static_cast<int>(frac * static_cast<float>(row_h));
+
+    // Rysuj visible+1 wierszy, zeby smooth scroll nie pokazywal pustki.
+    const int draw_count = std::min(visible + 1, total - first);
+    for (int i = 0; i < draw_count; ++i) {
+        const int line = first + i;
+        if (line < 0 || line >= total) {
+            continue;
+        }
+        const auto& entry = entries[static_cast<std::size_t>(line)];
+        const int row_y = rows_y + i * row_h - y_shift;
         const int content_y = row_y + (row_h - thumb_h) / 2;
 
         SDL_Color color{200, 200, 210, 255};
@@ -118,11 +182,23 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
 
         renderer.DrawText(std::to_string(entry.score), ui::FontSize::Small, color, score_x,
                           content_y);
+    }
 
-        ++line;
-        if (line >= rows) {
-            break;
-        }
+    SDL_RenderSetClipRect(renderer.sdl(), nullptr);
+
+    // Wskaznik przewijania (pasek po prawej), gdy lista nie miesci sie w calosci.
+    if (total > visible) {
+        const float max_offset = static_cast<float>(total - visible);
+        const float t = max_offset > 0.f ? scroll_offset_ / max_offset : 0.f;
+        const int track_h = rows_h - lay.PM(0.01f);
+        const int thumb_bar_h = std::max(lay.PM(0.02f), track_h * visible / total);
+        const int track_x = area.x + area.w - lay.PM(0.012f);
+        const int track_y = rows_y + lay.PM(0.005f);
+        renderer.FillRoundedRect(SDL_Rect{track_x, track_y, lay.PM(0.006f), track_h},
+                                 lay.PM(0.003f), SDL_Color{60, 65, 100, 120});
+        const int thumb_y = track_y + static_cast<int>((track_h - thumb_bar_h) * t);
+        renderer.FillRoundedRect(SDL_Rect{track_x, thumb_y, lay.PM(0.006f), thumb_bar_h},
+                                 lay.PM(0.003f), SDL_Color{180, 190, 255, 200});
     }
 }
 

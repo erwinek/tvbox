@@ -39,7 +39,7 @@ struct Config {
     std::string server_url;
     std::string auth_token;
     bool sync_enabled = true;
-    int leaderboard_size = 10;
+    int leaderboard_size = 10;  // liczba pozycji w TOP (10..100)
 
     // Tryby gry (data-driven). Domyslnie Boxer + Kopacz gdy brak w configu.
     std::vector<GameModeDef> game_modes;
