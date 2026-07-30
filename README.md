@@ -110,12 +110,63 @@ Na RPI warto dodać użytkownika do grup `video` i `dialout`, a także upewnić 
 Linie sa parsowane w `[src/io/Protocol.cpp](src/io/Protocol.cpp)` na zdarzenia `InputEvent`.
 
 ## Konfiguracja
-Ustawienia w `config/app.yaml` (RPI) i `config/app-windows.yaml` (dev):
+Ustawienia w `config/app.yaml` (RPI), `config/app-wyse.yaml` (Dell Wyse / Ubuntu) i `config/app-windows.yaml` (dev):
 - `serial_port`, `baud_rate`
 - `camera_command` (ffmpeg/libcamera, z `{output}` i `{camera}` — auto-wykrywanie pierwszej kamery)
 - `server_url`, `auth_token` (dla sync)
 - `game_modes` — lista trybow `id:nazwa:mnoznik`, np. `"boxer:BOXER:1.0, kopacz:KOPACZ:1.1"`
 - `sound_coin`, `sound_hit`, `sound_select`, `sound_win`, `music_attract` — opcjonalne audio (puste = cisza)
+
+## Deployment na Dell Wyse (Ubuntu + Wayland)
+
+Host alias (z laptopa): `ssh wyse` (user `boxer`).
+
+### Szybki deploy (na Wyse)
+```bash
+git clone <repo-url> ~/tvbox-src
+cd ~/tvbox-src
+chmod +x scripts/deploy_wyse.sh
+./scripts/deploy_wyse.sh
+```
+
+Z laptopa (sync + deploy):
+```powershell
+scp -r C:\github\tvbox boxer@wyse:~/tvbox-src
+ssh wyse "cd ~/tvbox-src && chmod +x scripts/deploy_wyse.sh && ./scripts/deploy_wyse.sh"
+```
+
+Skrypt:
+1. Instaluje zależności (SDL2, ffmpeg, cmake — bez libcamera)
+2. Buduje Release
+3. Instaluje do `/home/boxer/tvbox/` z `config/app-wyse.yaml` (4K portrait, `use_kms: false`)
+4. Dodaje `boxer` do grup `video`, `dialout`, `render`, `input`
+5. Instaluje systemd `tvbox` (Wayland: `WAYLAND_DISPLAY=wayland-0`)
+
+### Zarządzanie (system service — wymaga sudo w `deploy_wyse.sh`)
+```bash
+sudo systemctl status tvbox
+sudo journalctl -u tvbox -f
+sudo systemctl restart tvbox
+```
+
+Gdy brak hasła sudo z SSH, usługa może działać jako user unit:
+```bash
+systemctl --user status tvbox
+journalctl --user -u tvbox -f
+systemctl --user restart tvbox
+```
+
+### Struktura po instalacji
+```
+/home/boxer/tvbox/
+├── bin/tvbox_gui
+├── config/app-wyse.yaml
+├── data/
+│   ├── leaderboard.db
+│   └── videos/
+└── assets/
+    └── fonts/DejaVuSans.ttf
+```
 
 ## Deployment na RPI5
 

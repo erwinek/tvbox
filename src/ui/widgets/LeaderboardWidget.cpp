@@ -10,23 +10,29 @@ namespace ui::widgets {
 namespace {
 
 // Frakcje min-wymiaru ekranu — spojne proporcje na FullHD i 4K.
-constexpr float kRowHFrac = 0.068f;
+constexpr float kRowHFrac = 0.285f;  // ~3x wieksze wiersze (film + wynik)
 constexpr float kTitlePadFrac = 0.015f;
 constexpr float kRowPadXFrac = 0.011f;
-constexpr float kRankXFrac = 0.015f;
+constexpr float kRowShiftXFrac = 0.018f;  // przesuniecie listy w prawo od krawedzi panelu
 constexpr float kRankColWFrac = 0.033f;
-constexpr float kScoreGapFrac = 0.011f;
+constexpr float kScoreGapFrac = 0.016f;
 constexpr float kRadiusFrac = 0.022f;
 
-// Auto-scroll: wiersze / sekunde oraz pauza na koncach (ms).
-constexpr float kScrollRowsPerSec = 0.55f;
-constexpr Uint32 kScrollPauseMs = 1600;
+// Auto-scroll: piksele na sekunde jako frakcja wiersza; pauza na koncach (ms).
+constexpr Uint32 kScrollPauseMs = 2000;
+
+SDL_Color RowColor(int line) {
+    if (line == 0) return {255, 215, 0, 255};
+    if (line == 1) return {192, 192, 192, 255};
+    if (line == 2) return {205, 127, 50, 255};
+    return {200, 200, 210, 255};
+}
 
 }  // namespace
 
 void LeaderboardWidget::Invalidate() {
     clips_.clear();
-    scroll_offset_ = 0.f;
+    scroll_px_ = 0.f;
     scroll_dir_ = 1;
     last_scroll_ms_ = 0;
     pause_until_ms_ = 0;
@@ -43,9 +49,10 @@ ui::FrameSequencePlayer& LeaderboardWidget::GetClip(ui::Renderer& renderer,
     return player;
 }
 
-void LeaderboardWidget::UpdateScroll(int total_rows, int visible_rows, Uint32 now_ms) {
-    if (total_rows <= visible_rows) {
-        scroll_offset_ = 0.f;
+void LeaderboardWidget::UpdateScroll(int total_rows, int visible_rows, int row_h, Uint32 now_ms) {
+    const int overflow_rows = total_rows - visible_rows;
+    if (overflow_rows <= 0 || row_h <= 0) {
+        scroll_px_ = 0.f;
         last_scroll_ms_ = now_ms;
         return;
     }
@@ -67,15 +74,16 @@ void LeaderboardWidget::UpdateScroll(int total_rows, int visible_rows, Uint32 no
         return;
     }
 
-    const float max_offset = static_cast<float>(total_rows - visible_rows);
-    scroll_offset_ += static_cast<float>(scroll_dir_) * kScrollRowsPerSec * dt_s;
+    // Plinny scroll w pikselach: ~0.5 wiersza na sekunde.
+    const float max_px = static_cast<float>(overflow_rows * row_h);
+    scroll_px_ += static_cast<float>(scroll_dir_) * 0.5f * static_cast<float>(row_h) * dt_s;
 
-    if (scroll_offset_ <= 0.f) {
-        scroll_offset_ = 0.f;
+    if (scroll_px_ <= 0.f) {
+        scroll_px_ = 0.f;
         scroll_dir_ = 1;
         pause_until_ms_ = now_ms + kScrollPauseMs;
-    } else if (scroll_offset_ >= max_offset) {
-        scroll_offset_ = max_offset;
+    } else if (scroll_px_ >= max_px) {
+        scroll_px_ = max_px;
         scroll_dir_ = -1;
         pause_until_ms_ = now_ms + kScrollPauseMs;
     }
@@ -95,14 +103,17 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
     const int title_h = renderer.MeasureText("TOP SCORES", ui::FontSize::Normal).y;
     const int rows_start = title_pad + title_h + title_pad;
 
+    // Wiersze wypelniaja caly widget az do dolu (nie zostawiamy pustki nad HUD).
+    const int rows_h = area.h - rows_start;
     const int total = static_cast<int>(entries.size());
-    const int fit_rows = (area.h - rows_start - title_pad) / row_h;
+    const int fit_rows = rows_h / row_h;
     const int visible = std::min(total, std::max(0, fit_rows));
     if (visible <= 0) {
         return;
     }
 
-    const int board_h = rows_start + visible * row_h + title_pad;
+    // Widget wypelnia caly `area` — ma rozciagac sie do dolu ekranu.
+    const int board_h = area.h;
     renderer.Panel(SDL_Rect{area.x, area.y, area.w, board_h}, lay.PM(kRadiusFrac),
                    SDL_Color{16, 18, 38, 145}, SDL_Color{70, 80, 150, 150});
 
@@ -110,23 +121,30 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
                       area.x + area.w / 2, area.y + title_pad, true, 255, 1.0f, 2);
 
     const Uint32 elapsed = renderer.ticks();
-    UpdateScroll(total, visible, elapsed);
+    UpdateScroll(total, visible, row_h, elapsed);
 
     const int clip_fps = 10;
     const int row_pad_x = lay.PM(kRowPadXFrac);
-    const int rank_x = lay.PM(kRankXFrac);
+    const int rank_x = lay.PM(kRowShiftXFrac);
     const int rank_col_w = lay.PM(kRankColWFrac);
     const int score_gap = lay.PM(kScoreGapFrac);
 
+    // Wysokosci tekstu liczymy raz na widget (nie co klatke).
+    if (rank_text_h_ == 0) {
+        rank_text_h_ = renderer.MeasureText("1.", ui::FontSize::Normal).y;
+        score_text_h_ = renderer.MeasureText("0", ui::FontSize::Large).y;
+    }
+    const int rank_text_h = rank_text_h_;
+    const int score_text_h = score_text_h_;
+
     const int rows_y = area.y + rows_start;
-    const int rows_h = visible * row_h;
     const SDL_Rect clip_design{area.x, rows_y, area.w, rows_h};
     const SDL_Rect clip_screen = lay.Rect(clip_design.x, clip_design.y, clip_design.w, clip_design.h);
     SDL_RenderSetClipRect(renderer.sdl(), &clip_screen);
 
-    const int first = static_cast<int>(std::floor(scroll_offset_));
-    const float frac = scroll_offset_ - static_cast<float>(first);
-    const int y_shift = static_cast<int>(frac * static_cast<float>(row_h));
+    // Scroll w pikselach -> indeks pierwszego wiersza i dokladny shift.
+    const int first = static_cast<int>(scroll_px_ / static_cast<float>(row_h));
+    const int y_shift = static_cast<int>(scroll_px_) - first * row_h;
 
     // Rysuj visible+1 wierszy, zeby smooth scroll nie pokazywal pustki.
     const int draw_count = std::min(visible + 1, total - first);
@@ -139,10 +157,7 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
         const int row_y = rows_y + i * row_h - y_shift;
         const int content_y = row_y + (row_h - thumb_h) / 2;
 
-        SDL_Color color{200, 200, 210, 255};
-        if (line == 0) color = {255, 215, 0, 255};
-        else if (line == 1) color = {192, 192, 192, 255};
-        else if (line == 2) color = {205, 127, 50, 255};
+        const SDL_Color color = RowColor(line);
 
         const Uint8 row_alpha = static_cast<Uint8>(line % 2 == 0 ? 12 : 4);
         renderer.FillRoundedRect(
@@ -150,7 +165,9 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
             lay.PM(0.009f), SDL_Color{255, 255, 255, row_alpha});
 
         const std::string rank = std::to_string(line + 1) + ".";
-        renderer.DrawText(rank, ui::FontSize::Small, color, area.x + rank_x, content_y);
+        const int rank_y = row_y + (row_h - rank_text_h) / 2;
+        renderer.DrawText(rank, ui::FontSize::Normal, color, area.x + rank_x, rank_y, false, 255,
+                          1.0f, 1);
 
         int score_x = area.x + rank_x + rank_col_w;
         bool has_clip = false;
@@ -180,16 +197,18 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
             score_x += thumb_w + score_gap;
         }
 
-        renderer.DrawText(std::to_string(entry.score), ui::FontSize::Small, color, score_x,
-                          content_y);
+        // Wynik wiekszym fontem (jak INSERT COIN), numer zostaje Normal.
+        const int score_y = row_y + (row_h - score_text_h) / 2;
+        renderer.DrawText(std::to_string(entry.score), ui::FontSize::Large, color, score_x,
+                          score_y, false, 255, 1.0f, 1);
     }
 
     SDL_RenderSetClipRect(renderer.sdl(), nullptr);
 
     // Wskaznik przewijania (pasek po prawej), gdy lista nie miesci sie w calosci.
     if (total > visible) {
-        const float max_offset = static_cast<float>(total - visible);
-        const float t = max_offset > 0.f ? scroll_offset_ / max_offset : 0.f;
+        const float max_px = static_cast<float>((total - visible) * row_h);
+        const float t = max_px > 0.f ? scroll_px_ / max_px : 0.f;
         const int track_h = rows_h - lay.PM(0.01f);
         const int thumb_bar_h = std::max(lay.PM(0.02f), track_h * visible / total);
         const int track_x = area.x + area.w - lay.PM(0.012f);

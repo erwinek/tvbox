@@ -83,7 +83,7 @@ void AttractScreen::Render(core::AppContext& ctx) {
     }
 
     const int header_h = ui::widgets::RenderHeader(r);
-    const int bottom_reserved = lay.PH(0.12f);  // HUD + scrollbar
+    const int bottom_reserved = lay.PH(0.05f);  // HUD + scrollbar; wiecej miejsca na TOP SCORES
 
     // Aranzacja: pion - panel u gory, ranking pod nim na szerokosc;
     // poziom - panel po lewej, ranking w prawej kolumnie.

@@ -160,9 +160,15 @@ void App::Run() {
         }
 
         // 7) Render aktywnego ekranu.
+        const Uint32 frame_start = SDL_GetTicks();
         fsm_.Render(ctx_);
 
-        SDL_Delay(16);
+        // Frame limiter: nie spij sztywno 16ms (to dawalo ~35fps), tylko
+        // do vsync (~60fps) biorac pod uwage czas renderowania.
+        const Uint32 frame_ms = SDL_GetTicks() - frame_start;
+        if (frame_ms < 14) {
+            SDL_Delay(14 - frame_ms);
+        }
     }
 }
 

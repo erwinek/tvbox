@@ -1,0 +1,36 @@
+# Produkcja: Dell Wyse (Ubuntu + GNOME Wayland), monitor 4K portrait
+serial_port: "/dev/ttyUSB0"
+baud_rate: 115200
+# Design-space 4K portrait; fullscreen bierze tryb desktopu (po rotacji GNOME).
+window_width: 2160
+window_height: 3840
+fullscreen: true
+use_kms: false
+layout_scale: auto
+
+assets_dir: "assets"
+font_path: "assets/fonts/DejaVuSans.ttf"
+font_path_heading: ""
+
+db_path: "data/leaderboard.db"
+video_dir: "data/videos"
+# Filmy tla (walki bokserskie itp.); mp4/mkv/webm - odtwarzane w petli jako przyciemnione tlo.
+background_dir: "assets/backgrounds"
+camera_duration_ms: 3000
+camera_post_hit_ms: 1000
+camera_command: "ffmpeg -y -f v4l2 -input_format mjpeg -video_size 1280x720 -framerate 30 -i {camera} -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -keyint_min 15 -f mpegts pipe:1"
+
+server_url: ""
+auth_token: ""
+sync_enabled: true
+leaderboard_size: 30  # TOP N (min 10, max 100); przy braku miejsca — auto-scroll
+
+# Tryby gry: id:nazwa:mnoznik, oddzielone przecinkami
+game_modes: "boxer:BOXER:1.0, kopacz:KOPACZ:1.1"
+
+# Audio (opcjonalne; puste = brak dzwieku). Pliki .wav / .ogg w assets/sfx/
+sound_coin: ""
+sound_hit: ""
+sound_select: ""
+sound_win: ""
+music_attract: ""

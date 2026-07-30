@@ -1,0 +1,23 @@
+[Unit]
+Description=TVBox Boxer GUI (Wyse)
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=boxer
+Group=boxer
+WorkingDirectory=/home/boxer/tvbox
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=SDL_VIDEODRIVER=wayland
+ExecStart=/home/boxer/tvbox/bin/tvbox_gui /home/boxer/tvbox/config/app-wyse.yaml
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+SupplementaryGroups=video dialout render input
+
+[Install]
+WantedBy=graphical.target

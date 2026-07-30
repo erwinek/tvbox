@@ -127,14 +127,17 @@ void Renderer::DrawVerticalGradient(SDL_Color top, SDL_Color bottom) {
     if (h <= 1) {
         return;
     }
-    for (int y = 0; y < h; ++y) {
+    // Grupuj w paski co 8 px — ~8x mniej wywolan draw, wizualnie bez roznicy.
+    constexpr int band = 8;
+    for (int y = 0; y < h; y += band) {
         const float t = static_cast<float>(y) / static_cast<float>(h - 1);
         const Uint8 r = static_cast<Uint8>(top.r + (bottom.r - top.r) * t);
         const Uint8 g = static_cast<Uint8>(top.g + (bottom.g - top.g) * t);
         const Uint8 b = static_cast<Uint8>(top.b + (bottom.b - top.b) * t);
         const Uint8 a = static_cast<Uint8>(top.a + (bottom.a - top.a) * t);
         SDL_SetRenderDrawColor(renderer_, r, g, b, a);
-        SDL_RenderDrawLine(renderer_, 0, y, layout_.actual_w, y);
+        SDL_Rect rc{0, y, layout_.actual_w, band};
+        SDL_RenderFillRect(renderer_, &rc);
     }
 }
 

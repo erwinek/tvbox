@@ -26,11 +26,15 @@ public:
 
 private:
     ui::FrameSequencePlayer& GetClip(ui::Renderer& renderer, const std::string& frames_dir);
-    void UpdateScroll(int total_rows, int visible_rows, Uint32 now_ms);
+    void UpdateScroll(int total_rows, int visible_rows, int row_h, Uint32 now_ms);
 
     std::map<std::string, ui::FrameSequencePlayer> clips_;
 
-    float scroll_offset_ = 0.f;  // indeks pierwszego widocznego wiersza (moze byc ulamkowy)
+    // Cache wysokosci tekstu (unika TTF_SizeUTF8 co klatke).
+    int rank_text_h_ = 0;
+    int score_text_h_ = 0;
+
+    float scroll_px_ = 0.f;  // przesuniecie w pikselach (plinny scroll)
     int scroll_dir_ = 1;
     Uint32 last_scroll_ms_ = 0;
     Uint32 pause_until_ms_ = 0;
