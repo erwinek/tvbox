@@ -78,6 +78,15 @@ sleep 3
 sudo systemctl status ${SERVICE_NAME}.service --no-pager || true
 
 echo ""
+echo "--- Hardening (power-cycle) ---"
+if [[ -f "$PROJECT_DIR/scripts/harden_wyse.sh" ]]; then
+  sed -i 's/\r$//' "$PROJECT_DIR/scripts/harden_wyse.sh" || true
+  sudo bash "$PROJECT_DIR/scripts/harden_wyse.sh"
+fi
+
+echo ""
 echo "=== Done ==="
 echo "DRM atomic probe: sudo $INSTALL_DIR/bin/drm_rotate_probe 270 1920 1080"
 echo "Logs: sudo journalctl -u ${SERVICE_NAME} -f / $INSTALL_DIR/data/tvbox.log"
+echo "Hardening: scripts/harden_wyse.sh"
+echo "Readonly root + RW data: sudo bash scripts/setup_readonly_root.sh && sudo reboot"
