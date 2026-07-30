@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy TVBox na Dell Wyse — Ubuntu Server + Sway kiosk (HW rotate i915).
+# Deploy TVBox na Dell Wyse — Sway FHD (domyslnie). DRM atomic probe w bin/.
 set -euo pipefail
 
 INSTALL_DIR="/home/boxer/tvbox"
@@ -8,7 +8,7 @@ SERVICE_USER="boxer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== TVBox Wyse Kiosk (Sway + HW rotate) ==="
+echo "=== TVBox Wyse Kiosk (Sway FHD) ==="
 
 if [[ "$(id -u)" -eq 0 ]]; then
   echo "Nie uruchamiaj jako root."
@@ -24,7 +24,7 @@ sudo apt-get install -y --no-install-recommends \
   libgbm-dev libdrm-dev libegl1-mesa-dev \
   libsqlite3-dev libcurl4-openssl-dev \
   ffmpeg fonts-dejavu-core git \
-  sway seatd libdrm-tests
+  sway seatd
 
 echo ""
 echo "--- [2/7] Build ---"
@@ -53,6 +53,7 @@ cp "$PROJECT_DIR/config/sway-kiosk.conf" "$INSTALL_DIR/config/sway-kiosk.conf"
 cp "$PROJECT_DIR/scripts/tvbox-kiosk-run.sh" "$INSTALL_DIR/bin/tvbox-kiosk-run.sh"
 chmod +x "$INSTALL_DIR/bin/tvbox-kiosk-run.sh"
 sed -i 's/\r$//' "$INSTALL_DIR/bin/tvbox-kiosk-run.sh" "$INSTALL_DIR/config/sway-kiosk.conf" || true
+[ -f "$PROJECT_DIR/build/drm_rotate_probe" ] && cp "$PROJECT_DIR/build/drm_rotate_probe" "$INSTALL_DIR/bin/"
 
 FONT_SRC="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_DST="$INSTALL_DIR/assets/fonts/DejaVuSans.ttf"
@@ -62,15 +63,9 @@ echo ""
 echo "--- [5/7] Groups / seatd ---"
 sudo usermod -aG video,dialout,render,input "$SERVICE_USER"
 sudo systemctl enable --now seatd.service 2>/dev/null || true
-sudo tee /etc/udev/rules.d/99-tvbox-serial.rules >/dev/null <<'EOF'
-KERNEL=="ttyUSB*", MODE="0660", GROUP="dialout"
-KERNEL=="ttyACM*", MODE="0660", GROUP="dialout"
-EOF
-sudo udevadm control --reload-rules 2>/dev/null || true
 
 echo ""
 echo "--- [6/7] systemd ---"
-systemctl --user stop tvbox 2>/dev/null || true
 sudo cp "$PROJECT_DIR/scripts/tvbox-kiosk.service" /etc/systemd/system/${SERVICE_NAME}.service
 sudo systemctl daemon-reload
 sudo systemctl enable ${SERVICE_NAME}.service
@@ -84,5 +79,5 @@ sudo systemctl status ${SERVICE_NAME}.service --no-pager || true
 
 echo ""
 echo "=== Done ==="
-echo "Logs: sudo journalctl -u ${SERVICE_NAME} -f"
-echo "Jesli obraz do gory nogami: w config/sway-kiosk.conf zmien transform 270 -> 90"
+echo "DRM atomic probe: sudo $INSTALL_DIR/bin/drm_rotate_probe 270 1920 1080"
+echo "Logs: sudo journalctl -u ${SERVICE_NAME} -f / $INSTALL_DIR/data/tvbox.log"

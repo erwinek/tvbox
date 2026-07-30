@@ -1,6 +1,6 @@
 [Unit]
-Description=TVBox Boxer GUI (Sway kiosk + HW rotate)
-After=multi-user.target systemd-user-sessions.service
+Description=TVBox Boxer GUI (Sway kiosk FHD + transform)
+After=multi-user.target systemd-user-sessions.service seatd.service
 Conflicts=getty@tty1.service
 
 [Service]
@@ -26,7 +26,6 @@ ExecStartPre=/bin/mkdir -p /run/user/1000
 ExecStartPre=/bin/chown boxer:boxer /run/user/1000
 ExecStartPre=/bin/chmod 700 /run/user/1000
 
-# Sway = lekki compositor; output transform = rotacja HW (i915 plane)
 ExecStart=/usr/bin/sway --config /home/boxer/tvbox/config/sway-kiosk.conf
 
 Restart=on-failure

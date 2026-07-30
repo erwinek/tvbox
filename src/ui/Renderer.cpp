@@ -2,6 +2,10 @@
 
 #include "util/Logger.h"
 
+#if defined(TVBOX_HAS_LIBDRM)
+#include "ui/DrmAtomicOutput.h"
+#endif
+
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 
@@ -27,6 +31,26 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
         display_rotate_ccw_ = 0;
     }
 
+#if defined(TVBOX_HAS_LIBDRM)
+    // DRM atomic + Y-tiled GBM (wymaga TVBOX_DRM_ATOMIC=1).
+    // Uwaga: present przez SDL software+ReadPixels jest wolniejszy niz Sway FHD.
+    const char* want_drm = getenv("TVBOX_DRM_ATOMIC");
+    if (want_drm && want_drm[0] == '1' && use_kms &&
+        (display_rotate_ccw_ == 90 || display_rotate_ccw_ == 270)) {
+        drm_ = std::make_unique<DrmAtomicOutput>();
+        const int prefer_w = display_width > 0 ? display_width : 1920;
+        const int prefer_h = display_height > 0 ? display_height : 1080;
+        if (!drm_->Init(display_rotate_ccw_, prefer_w, prefer_h)) {
+            util::Log(util::LogLevel::Warn,
+                      "DRM atomic rotate failed — fallback do SDL (soft/sway)");
+            drm_.reset();
+        } else {
+            SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
+            util::Log(util::LogLevel::Info, "Using DRM atomic rotate + SDL dummy offscreen");
+        }
+    }
+#endif
+
     if (use_kms && !getenv("SDL_VIDEODRIVER")) {
         SDL_setenv("SDL_VIDEODRIVER", "kmsdrm", 0);
     }
@@ -37,6 +61,13 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
         window_w = display_width;
         window_h = display_height;
     }
+#if defined(TVBOX_HAS_LIBDRM)
+    if (drm_ && drm_->ok()) {
+        window_w = drm_->logical_w();
+        window_h = drm_->logical_h();
+        fullscreen_ = false;  // dummy window, nie fullscreen desktop
+    }
+#endif
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         util::Log(util::LogLevel::Error, std::string("SDL init failed: ") + SDL_GetError());
@@ -62,9 +93,19 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
         return false;
     }
 
+#if defined(TVBOX_HAS_LIBDRM)
+    const bool drm_active = drm_ && drm_->ok();
+#else
+    const bool drm_active = false;
+#endif
+
     // VSYNC: na KMS/DRM daje czysty page-flip; na Wayland bywal wolny (compositor).
-    renderer_ = SDL_CreateRenderer(window_, -1,
-                                   SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    // Przy DRM atomic: software offscreen (ReadPixels -> GBM Present).
+    Uint32 rflags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+    if (drm_active) {
+        rflags = SDL_RENDERER_SOFTWARE;
+    }
+    renderer_ = SDL_CreateRenderer(window_, -1, rflags);
     if (!renderer_) {
         util::Log(util::LogLevel::Error, std::string("SDL renderer failed: ") + SDL_GetError());
         return false;
@@ -78,20 +119,28 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
     phys_w_ = phys_w;
     phys_h_ = phys_h;
 
-    // Przy rotacji 90/270 logiczny framebuffer ma zamienione wymiary (portrait na landscape EDID).
-    // Half-res target: 4x mniej px przy rysowaniu + przy SDL_RenderCopyEx (Celeron UHD 600).
     int actual_w = phys_w;
     int actual_h = phys_h;
-    if (display_rotate_ccw_ == 90 || display_rotate_ccw_ == 270) {
-        actual_w = phys_h;
-        actual_h = phys_w;
-    }
-    if (display_rotate_ccw_ != 0) {
-        actual_w = std::max(1, actual_w / 2);
-        actual_h = std::max(1, actual_h / 2);
-    }
 
-    if (display_rotate_ccw_ != 0) {
+#if defined(TVBOX_HAS_LIBDRM)
+    if (drm_active) {
+        actual_w = drm_->logical_w();
+        actual_h = drm_->logical_h();
+        phys_w_ = drm_->mode_w();
+        phys_h_ = drm_->mode_h();
+        // Okno dummy dopasuj do FB.
+        SDL_SetWindowSize(window_, actual_w, actual_h);
+        present_buf_.assign(static_cast<size_t>(actual_w) * static_cast<size_t>(actual_h) * 4, 0);
+        util::Log(util::LogLevel::Info,
+                  "DRM present path: fb " + std::to_string(actual_w) + "x" +
+                      std::to_string(actual_h) + " mode " + std::to_string(phys_w_) + "x" +
+                      std::to_string(phys_h_));
+    } else
+#endif
+        if (display_rotate_ccw_ == 90 || display_rotate_ccw_ == 270) {
+        // Soft fallback (RenderCopyEx) — half-res.
+        actual_w = std::max(1, phys_h / 2);
+        actual_h = std::max(1, phys_w / 2);
         rotate_target_ =
             SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
                               actual_w, actual_h);
@@ -102,10 +151,8 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
         }
         SDL_SetTextureBlendMode(rotate_target_, SDL_BLENDMODE_BLEND);
         util::Log(util::LogLevel::Info,
-                  "Display rotate " + std::to_string(display_rotate_ccw_) +
-                      " CCW: target " + std::to_string(actual_w) + "x" +
-                      std::to_string(actual_h) + " (half) -> phys " + std::to_string(phys_w) + "x" +
-                      std::to_string(phys_h));
+                  "Display soft-rotate " + std::to_string(display_rotate_ccw_) + " CCW target " +
+                      std::to_string(actual_w) + "x" + std::to_string(actual_h));
     }
 
     layout_ = Layout::Create(design_width, design_height, actual_w, actual_h, layout_scale_override);
@@ -142,6 +189,13 @@ void Renderer::Shutdown() {
         SDL_DestroyWindow(window_);
         window_ = nullptr;
     }
+#if defined(TVBOX_HAS_LIBDRM)
+    if (drm_) {
+        drm_->Shutdown();
+        drm_.reset();
+    }
+    present_buf_.clear();
+#endif
     IMG_Quit();
     TTF_Quit();
     SDL_Quit();
@@ -164,22 +218,32 @@ void Renderer::BeginFrame(SDL_Color clear) {
 }
 
 void Renderer::EndFrame() {
+#if defined(TVBOX_HAS_LIBDRM)
+    if (drm_ && drm_->ok()) {
+        const int w = layout_.actual_w;
+        const int h = layout_.actual_h;
+        const int pitch = w * 4;
+        if (static_cast<int>(present_buf_.size()) < pitch * h) {
+            present_buf_.assign(static_cast<size_t>(pitch) * static_cast<size_t>(h), 0);
+        }
+        if (SDL_RenderReadPixels(renderer_, nullptr, SDL_PIXELFORMAT_ARGB8888, present_buf_.data(),
+                                 pitch) == 0) {
+            drm_->Present(present_buf_.data(), pitch);
+        }
+        return;
+    }
+#endif
     if (rotate_target_) {
         SDL_SetRenderTarget(renderer_, nullptr);
         SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
         SDL_RenderClear(renderer_);
 
-        // SDL angle = clockwise; config to CCW -> negacja.
-        // dst = pelny ekran fizyczny — skala z half-res targetu.
         const double angle_cw = -static_cast<double>(display_rotate_ccw_);
-        int dst_w = layout_.actual_w;
-        int dst_h = layout_.actual_h;
+        int dst_w = phys_w_;
+        int dst_h = phys_h_;
         if (display_rotate_ccw_ == 90 || display_rotate_ccw_ == 270) {
             dst_w = phys_h_;
             dst_h = phys_w_;
-        } else {
-            dst_w = phys_w_;
-            dst_h = phys_h_;
         }
         SDL_Rect dst{phys_w_ / 2 - dst_w / 2, phys_h_ / 2 - dst_h / 2, dst_w, dst_h};
         SDL_RenderCopyEx(renderer_, rotate_target_, nullptr, &dst, angle_cw, nullptr,

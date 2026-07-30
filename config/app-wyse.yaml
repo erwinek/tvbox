@@ -1,11 +1,13 @@
-# Produkcja: Dell Wyse (Ubuntu Server + SDL KMS/DRM), monitor 4K
+# Produkcja: Dell Wyse — Sway kiosk (FHD) + transform 90
+# DRM atomic rotate dziala (drm_rotate_probe / TVBOX_DRM_ATOMIC=1), ale SDL software
+# present jest wolniejszy niz Sway — domyslnie Sway.
 serial_port: "/dev/ttyUSB0"
 baud_rate: 115200
-# Design-space Full HD portrait (po sway transform 90 z 1920x1080).
 window_width: 1080
 window_height: 1920
+display_width: 1920
+display_height: 1080
 fullscreen: true
-# Kiosk: Sway robi rotacje HW (i915); SDL na Wayland bez software rotate.
 use_kms: false
 display_rotate: 0
 layout_scale: auto
@@ -16,7 +18,6 @@ font_path_heading: ""
 
 db_path: "data/leaderboard.db"
 video_dir: "data/videos"
-# Filmy tla (walki bokserskie itp.); mp4/mkv/webm - odtwarzane w petli jako przyciemnione tlo.
 background_dir: "assets/backgrounds"
 camera_duration_ms: 3000
 camera_post_hit_ms: 1000
@@ -25,12 +26,10 @@ camera_command: "ffmpeg -y -f v4l2 -input_format mjpeg -video_size 1280x720 -fra
 server_url: ""
 auth_token: ""
 sync_enabled: true
-leaderboard_size: 30  # TOP N (min 10, max 100); przy braku miejsca — auto-scroll
+leaderboard_size: 30
 
-# Tryby gry: id:nazwa:mnoznik, oddzielone przecinkami
 game_modes: "boxer:BOXER:1.0, kopacz:KOPACZ:1.1"
 
-# Audio (opcjonalne; puste = brak dzwieku). Pliki .wav / .ogg w assets/sfx/
 sound_coin: ""
 sound_hit: ""
 sound_select: ""

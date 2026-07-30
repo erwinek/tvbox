@@ -6,7 +6,14 @@
 
 #include <SDL.h>
 
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <vector>
+
+#if defined(TVBOX_HAS_LIBDRM)
+#include "ui/DrmAtomicOutput.h"
+#endif
 
 namespace ui {
 
@@ -25,7 +32,6 @@ public:
 
     SDL_Renderer* sdl() const { return renderer_; }
     const Layout& layout() const { return layout_; }
-    // Rozmiar logiczny (design-space) — uzywaj do layoutu UI.
     int width() const { return layout_.design_w; }
     int height() const { return layout_.design_h; }
     int actual_width() const { return layout_.actual_w; }
@@ -37,7 +43,6 @@ public:
     void BeginFrame(SDL_Color clear);
     void EndFrame();
 
-    // Wypelnia caly ekran fizyczny pionowym gradientem.
     void DrawVerticalGradient(SDL_Color top, SDL_Color bottom);
 
     void FillRect(const SDL_Rect& rect, SDL_Color color);
@@ -53,11 +58,9 @@ public:
 
     void DrawImage(const std::string& path, const SDL_Rect& dst);
 
-    // Tworzy teksture tekstu (design-space). Uzywac do cache; niszczy SDL_DestroyTexture.
     SDL_Texture* CreateTextTexture(const std::string& text, FontSize size, SDL_Color color,
                                    int* out_w, int* out_h);
 
-    // Rozmiar tekstu w design-space (bazowy rozmiar fontu TTF).
     SDL_Point MeasureText(const std::string& text, FontSize size);
 
 private:
@@ -72,14 +75,19 @@ private:
 
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
-    SDL_Texture* rotate_target_ = nullptr;  // offscreen gdy display_rotate != 0
+    SDL_Texture* rotate_target_ = nullptr;  // soft rotate (fallback bez DRM)
     FontManager fonts_;
     TextureCache textures_;
     Layout layout_;
     bool fullscreen_ = false;
-    int display_rotate_ccw_ = 0;  // 0/90/180/270
+    int display_rotate_ccw_ = 0;
     int phys_w_ = 0;
     int phys_h_ = 0;
+
+#if defined(TVBOX_HAS_LIBDRM)
+    std::unique_ptr<DrmAtomicOutput> drm_;
+    std::vector<uint8_t> present_buf_;
+#endif
 };
 
 }  // namespace ui

@@ -78,6 +78,29 @@ else()
         ${CURL_INCLUDE_DIRS}
     )
 
+    pkg_check_modules(LIBDRM libdrm)
+    pkg_check_modules(GBM gbm)
+
+    set(TVBOX_LINUX_EXTRA_SOURCES)
+    set(TVBOX_LINUX_EXTRA_LIBS)
+    if(LIBDRM_FOUND AND GBM_FOUND)
+        list(APPEND TVBOX_LINUX_EXTRA_SOURCES src/ui/DrmAtomicOutput.cpp)
+        list(APPEND TVBOX_LINUX_EXTRA_LIBS ${LIBDRM_LIBRARIES} ${GBM_LIBRARIES})
+        target_include_directories(tvbox_gui PRIVATE ${LIBDRM_INCLUDE_DIRS} ${GBM_INCLUDE_DIRS})
+        target_compile_definitions(tvbox_gui PRIVATE TVBOX_HAS_LIBDRM=1)
+        message(STATUS "libdrm+gbm found — DRM atomic rotate enabled")
+
+        add_executable(drm_rotate_probe tools/drm_rotate_probe.cpp src/ui/DrmAtomicOutput.cpp
+                                        src/util/Logger.cpp)
+        target_include_directories(drm_rotate_probe PRIVATE src ${LIBDRM_INCLUDE_DIRS}
+                                                            ${GBM_INCLUDE_DIRS})
+        target_link_libraries(drm_rotate_probe PRIVATE ${LIBDRM_LIBRARIES} ${GBM_LIBRARIES})
+        target_compile_definitions(drm_rotate_probe PRIVATE TVBOX_HAS_LIBDRM=1)
+    else()
+        message(STATUS "libdrm/gbm not found — DRM atomic rotate disabled")
+    endif()
+
+    target_sources(tvbox_gui PRIVATE ${TVBOX_LINUX_EXTRA_SOURCES})
     target_link_libraries(tvbox_gui PRIVATE
         Threads::Threads
         ${SDL2_LIBRARIES}
@@ -86,6 +109,7 @@ else()
         ${SDL2_MIXER_LIBRARIES}
         ${SQLITE3_LIBRARIES}
         ${CURL_LIBRARIES}
+        ${TVBOX_LINUX_EXTRA_LIBS}
     )
 endif()
 
