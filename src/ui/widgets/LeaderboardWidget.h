@@ -20,15 +20,30 @@ namespace ui::widgets {
 // Gdy wpisow jest wiecej niz miesci sie w `area`, lista auto-scrolluje.
 class LeaderboardWidget {
 public:
+    ~LeaderboardWidget();
+
     void Render(ui::Renderer& renderer, const std::vector<ui::ScoreEntry>& entries,
                 const SDL_Rect& area);
     void Invalidate();  // wyczysc cache klipow gdy zmieni sie ranking
 
 private:
+    struct RowCache {
+        SDL_Texture* rank_tex = nullptr;
+        int rank_w = 0;
+        int rank_h = 0;
+        SDL_Texture* score_tex = nullptr;
+        int score_w = 0;
+        int score_h = 0;
+        SDL_Color color{200, 200, 210, 255};
+    };
+
     ui::FrameSequencePlayer& GetClip(ui::Renderer& renderer, const std::string& frames_dir);
     void UpdateScroll(int total_rows, int visible_rows, int row_h, Uint32 now_ms);
+    void ClearRowCache();
+    void RebuildRowCache(ui::Renderer& renderer, const std::vector<ui::ScoreEntry>& entries);
 
     std::map<std::string, ui::FrameSequencePlayer> clips_;
+    std::vector<RowCache> row_cache_;
 
     // Cache wysokosci tekstu (unika TTF_SizeUTF8 co klatke).
     int rank_text_h_ = 0;

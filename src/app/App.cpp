@@ -50,7 +50,7 @@ bool App::Init() {
 
     if (!renderer_.Init(cfg_.window_width, cfg_.window_height, cfg_.fullscreen, cfg_.font_path,
                         cfg_.font_path_heading, cfg_.use_kms, cfg_.layout_scale,
-                        cfg_.display_width, cfg_.display_height)) {
+                        cfg_.display_width, cfg_.display_height, cfg_.display_rotate)) {
         return false;
     }
 
@@ -163,11 +163,23 @@ void App::Run() {
         const Uint32 frame_start = SDL_GetTicks();
         fsm_.Render(ctx_);
 
-        // Frame limiter: nie spij sztywno 16ms (to dawalo ~35fps), tylko
-        // do vsync (~60fps) biorac pod uwage czas renderowania.
+        // FPS log co 120 klatek — do diagnozy płynnosci na Wyse.
+        static int fps_frames = 0;
+        static Uint32 fps_start = 0;
+        if (fps_start == 0) fps_start = frame_start;
+        ++fps_frames;
+        if (fps_frames >= 120) {
+            const Uint32 elapsed = frame_start - fps_start;
+            util::Log(util::LogLevel::Info,
+                      "FPS: " + std::to_string(elapsed > 0 ? fps_frames * 1000 / elapsed : 0));
+            fps_frames = 0;
+            fps_start = frame_start;
+        }
+
+        // Frame pacing: ~50fps na Wyse (Celeron 4K); vsync i tak moze obcinac.
         const Uint32 frame_ms = SDL_GetTicks() - frame_start;
-        if (frame_ms < 14) {
-            SDL_Delay(14 - frame_ms);
+        if (frame_ms < 20) {
+            SDL_Delay(20 - frame_ms);
         }
     }
 }

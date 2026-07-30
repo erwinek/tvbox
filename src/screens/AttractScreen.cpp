@@ -7,6 +7,7 @@
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
+#include "util/Logger.h"
 
 #include <cmath>
 
@@ -60,6 +61,11 @@ void AttractScreen::Render(core::AppContext& ctx) {
     const int w = r.width();
     const int h = r.height();
 
+    // Profiling: czas sekcji renderingu (co 120 klatek log).
+    static Uint32 prof_ui = 0, prof_board = 0, prof_end = 0;
+    static int prof_n = 0;
+    const Uint32 t0 = SDL_GetTicks();
+
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
     const bool has_bg = ctx.background && ctx.background->Render(r);
     const Uint8 grad_a = has_bg ? 170 : 255;
@@ -83,7 +89,7 @@ void AttractScreen::Render(core::AppContext& ctx) {
     }
 
     const int header_h = ui::widgets::RenderHeader(r);
-    const int bottom_reserved = lay.PH(0.05f);  // HUD + scrollbar; wiecej miejsca na TOP SCORES
+    const int bottom_reserved = lay.PH(0.10f);  // HUD + scrollbar; TOP SCORES ~5% krotsze
 
     // Aranzacja: pion - panel u gory, ranking pod nim na szerokosc;
     // poziom - panel po lewej, ranking w prawej kolumnie.
@@ -131,12 +137,29 @@ void AttractScreen::Render(core::AppContext& ctx) {
                    panel.y + panel.h / 2 + lay.PH(0.012f), true, alpha2, 1.0f, 2);
     }
 
+    const Uint32 t1 = SDL_GetTicks();
     board_.Render(r, ctx.leaderboard, board_area);
-    ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard);
+    const Uint32 t2 = SDL_GetTicks();
+    ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard, &board_area);
     scroll_.Render(r,
                    "Boxer Video  --  INSERT COIN  --  PLAY WITH ME  --  HIT HARDER!  --  ");
 
+    const Uint32 t3 = SDL_GetTicks();
     r.EndFrame();
+    const Uint32 t4 = SDL_GetTicks();
+
+    prof_ui += t1 - t0;
+    prof_board += t2 - t1;
+    prof_end += t4 - t3;
+    if (++prof_n >= 120) {
+        util::Log(util::LogLevel::Info,
+                  "Render ms avg: ui=" + std::to_string(prof_ui / prof_n) +
+                      " board=" + std::to_string(prof_board / prof_n) +
+                      " endframe=" + std::to_string(prof_end / prof_n) +
+                      " total=" + std::to_string((prof_ui + prof_board + prof_end) / prof_n));
+        prof_ui = prof_board = prof_end = 0;
+        prof_n = 0;
+    }
 }
 
 }  // namespace screens

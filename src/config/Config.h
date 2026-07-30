@@ -21,6 +21,8 @@ struct Config {
     int display_height = 0;
     bool fullscreen = true;
     bool use_kms = true;
+    // Rotacja wyjscia w stopniach CCW (0/90/180/270). Na Wyse monitor pionowy = 90.
+    int display_rotate = 0;
     // 0 = auto (min(actual/design)); >0 wymusza skale layoutu (debug).
     float layout_scale = 0.f;
 

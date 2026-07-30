@@ -19,8 +19,13 @@ Renderer::~Renderer() {
 bool Renderer::Init(int design_width, int design_height, bool fullscreen,
                     const std::string& font_path, const std::string& heading_font_path,
                     bool use_kms, float layout_scale_override, int display_width,
-                    int display_height) {
+                    int display_height, int display_rotate_ccw) {
     fullscreen_ = fullscreen;
+    display_rotate_ccw_ = display_rotate_ccw;
+    if (display_rotate_ccw_ != 0 && display_rotate_ccw_ != 90 && display_rotate_ccw_ != 180 &&
+        display_rotate_ccw_ != 270) {
+        display_rotate_ccw_ = 0;
+    }
 
     if (use_kms && !getenv("SDL_VIDEODRIVER")) {
         SDL_setenv("SDL_VIDEODRIVER", "kmsdrm", 0);
@@ -57,6 +62,7 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
         return false;
     }
 
+    // VSYNC: na KMS/DRM daje czysty page-flip; na Wayland bywal wolny (compositor).
     renderer_ = SDL_CreateRenderer(window_, -1,
                                    SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer_) {
@@ -64,10 +70,42 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
         return false;
     }
 
-    int actual_w = design_width;
-    int actual_h = design_height;
-    if (SDL_GetRendererOutputSize(renderer_, &actual_w, &actual_h) != 0) {
-        SDL_GetWindowSize(window_, &actual_w, &actual_h);
+    int phys_w = design_width;
+    int phys_h = design_height;
+    if (SDL_GetRendererOutputSize(renderer_, &phys_w, &phys_h) != 0) {
+        SDL_GetWindowSize(window_, &phys_w, &phys_h);
+    }
+    phys_w_ = phys_w;
+    phys_h_ = phys_h;
+
+    // Przy rotacji 90/270 logiczny framebuffer ma zamienione wymiary (portrait na landscape EDID).
+    // Half-res target: 4x mniej px przy rysowaniu + przy SDL_RenderCopyEx (Celeron UHD 600).
+    int actual_w = phys_w;
+    int actual_h = phys_h;
+    if (display_rotate_ccw_ == 90 || display_rotate_ccw_ == 270) {
+        actual_w = phys_h;
+        actual_h = phys_w;
+    }
+    if (display_rotate_ccw_ != 0) {
+        actual_w = std::max(1, actual_w / 2);
+        actual_h = std::max(1, actual_h / 2);
+    }
+
+    if (display_rotate_ccw_ != 0) {
+        rotate_target_ =
+            SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+                              actual_w, actual_h);
+        if (!rotate_target_) {
+            util::Log(util::LogLevel::Error,
+                      std::string("SDL rotate target failed: ") + SDL_GetError());
+            return false;
+        }
+        SDL_SetTextureBlendMode(rotate_target_, SDL_BLENDMODE_BLEND);
+        util::Log(util::LogLevel::Info,
+                  "Display rotate " + std::to_string(display_rotate_ccw_) +
+                      " CCW: target " + std::to_string(actual_w) + "x" +
+                      std::to_string(actual_h) + " (half) -> phys " + std::to_string(phys_w) + "x" +
+                      std::to_string(phys_h));
     }
 
     layout_ = Layout::Create(design_width, design_height, actual_w, actual_h, layout_scale_override);
@@ -92,6 +130,10 @@ bool Renderer::Init(int design_width, int design_height, bool fullscreen,
 void Renderer::Shutdown() {
     textures_.Clear();
     fonts_.Unload();
+    if (rotate_target_) {
+        SDL_DestroyTexture(rotate_target_);
+        rotate_target_ = nullptr;
+    }
     if (renderer_) {
         SDL_DestroyRenderer(renderer_);
         renderer_ = nullptr;
@@ -114,11 +156,35 @@ int Renderer::ScaleLen(int design_px) const {
 }
 
 void Renderer::BeginFrame(SDL_Color clear) {
+    if (rotate_target_) {
+        SDL_SetRenderTarget(renderer_, rotate_target_);
+    }
     SDL_SetRenderDrawColor(renderer_, clear.r, clear.g, clear.b, clear.a);
     SDL_RenderClear(renderer_);
 }
 
 void Renderer::EndFrame() {
+    if (rotate_target_) {
+        SDL_SetRenderTarget(renderer_, nullptr);
+        SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
+        SDL_RenderClear(renderer_);
+
+        // SDL angle = clockwise; config to CCW -> negacja.
+        // dst = pelny ekran fizyczny — skala z half-res targetu.
+        const double angle_cw = -static_cast<double>(display_rotate_ccw_);
+        int dst_w = layout_.actual_w;
+        int dst_h = layout_.actual_h;
+        if (display_rotate_ccw_ == 90 || display_rotate_ccw_ == 270) {
+            dst_w = phys_h_;
+            dst_h = phys_w_;
+        } else {
+            dst_w = phys_w_;
+            dst_h = phys_h_;
+        }
+        SDL_Rect dst{phys_w_ / 2 - dst_w / 2, phys_h_ / 2 - dst_h / 2, dst_w, dst_h};
+        SDL_RenderCopyEx(renderer_, rotate_target_, nullptr, &dst, angle_cw, nullptr,
+                         SDL_FLIP_NONE);
+    }
     SDL_RenderPresent(renderer_);
 }
 
@@ -127,8 +193,8 @@ void Renderer::DrawVerticalGradient(SDL_Color top, SDL_Color bottom) {
     if (h <= 1) {
         return;
     }
-    // Grupuj w paski co 8 px — ~8x mniej wywolan draw, wizualnie bez roznicy.
-    constexpr int band = 8;
+    // Grupuj w paski co 16 px — mniej wywolan draw, wizualnie bez roznicy.
+    constexpr int band = 16;
     for (int y = 0; y < h; y += band) {
         const float t = static_cast<float>(y) / static_cast<float>(h - 1);
         const Uint8 r = static_cast<Uint8>(top.r + (bottom.r - top.r) * t);
@@ -149,32 +215,35 @@ void Renderer::FillRect(const SDL_Rect& rect, SDL_Color color) {
 
 void Renderer::FillRoundedRect(const SDL_Rect& rect, int radius, SDL_Color color) {
     const SDL_Rect screen = ToScreen(rect);
-    const int r = ScaleLen(radius);
     if (screen.w <= 0 || screen.h <= 0) {
         return;
     }
-    int rad = r;
+    int rad = ScaleLen(radius);
     rad = std::min(rad, screen.w / 2);
     rad = std::min(rad, screen.h / 2);
-    if (rad <= 0) {
-        SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);
+
+    SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);
+    if (rad <= 2) {
         SDL_RenderFillRect(renderer_, &screen);
         return;
     }
 
-    SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);
-    for (int dy = 0; dy < screen.h; ++dy) {
-        int inset = 0;
-        if (dy < rad) {
-            const int yy = rad - dy;
-            inset = rad - static_cast<int>(std::sqrt(static_cast<double>(rad * rad - yy * yy)));
-        } else if (dy >= screen.h - rad) {
-            const int yy = dy - (screen.h - rad) + 1;
-            inset = rad - static_cast<int>(std::sqrt(static_cast<double>(rad * rad - yy * yy)));
-        }
-        SDL_Rect line{screen.x + inset, screen.y + dy, screen.w - 2 * inset, 1};
-        SDL_RenderFillRect(renderer_, &line);
-    }
+    // 3 prostokaty zamiast skanlinii co px (na 4K to byl glowny koszt CPU/GPU).
+    SDL_Rect mid{screen.x + rad, screen.y, screen.w - 2 * rad, screen.h};
+    SDL_Rect left{screen.x, screen.y + rad, rad, screen.h - 2 * rad};
+    SDL_Rect right{screen.x + screen.w - rad, screen.y + rad, rad, screen.h - 2 * rad};
+    SDL_RenderFillRect(renderer_, &mid);
+    SDL_RenderFillRect(renderer_, &left);
+    SDL_RenderFillRect(renderer_, &right);
+    // Narożniki: male kwadraty (wizualnie wystarczajace w kiosku).
+    SDL_Rect c1{screen.x, screen.y, rad, rad};
+    SDL_Rect c2{screen.x + screen.w - rad, screen.y, rad, rad};
+    SDL_Rect c3{screen.x, screen.y + screen.h - rad, rad, rad};
+    SDL_Rect c4{screen.x + screen.w - rad, screen.y + screen.h - rad, rad, rad};
+    SDL_RenderFillRect(renderer_, &c1);
+    SDL_RenderFillRect(renderer_, &c2);
+    SDL_RenderFillRect(renderer_, &c3);
+    SDL_RenderFillRect(renderer_, &c4);
 }
 
 void Renderer::Panel(const SDL_Rect& rect, int radius, SDL_Color fill, SDL_Color border) {
@@ -213,6 +282,11 @@ SDL_Texture* Renderer::MakeTextTexture(const std::string& text, FontSize size, S
     if (out_h) *out_h = surface->h;
     SDL_FreeSurface(surface);
     return texture;
+}
+
+SDL_Texture* Renderer::CreateTextTexture(const std::string& text, FontSize size, SDL_Color color,
+                                         int* out_w, int* out_h) {
+    return MakeTextTexture(text, size, color, out_w, out_h);
 }
 
 void Renderer::RenderTextOnce(const std::string& text, FontSize size, SDL_Color color, int x,

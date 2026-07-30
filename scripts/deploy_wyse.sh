@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Deploy TVBox na Dell Wyse — Ubuntu Server + Sway kiosk (HW rotate i915).
 set -euo pipefail
 
 INSTALL_DIR="/home/boxer/tvbox"
@@ -7,85 +8,81 @@ SERVICE_USER="boxer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== TVBox Wyse Deployment ==="
-echo "Install dir: $INSTALL_DIR"
-echo "Source dir:   $PROJECT_DIR"
-echo "User:         $SERVICE_USER"
+echo "=== TVBox Wyse Kiosk (Sway + HW rotate) ==="
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  echo "Nie uruchamiaj jako root."
+  exit 1
+fi
 
 echo ""
-echo "--- [1/7] Installing dependencies ---"
+echo "--- [1/7] Dependencies ---"
 sudo apt-get update -qq
 sudo apt-get install -y --no-install-recommends \
   build-essential cmake pkg-config \
   libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev libsdl2-mixer-dev \
+  libgbm-dev libdrm-dev libegl1-mesa-dev \
   libsqlite3-dev libcurl4-openssl-dev \
-  ffmpeg \
-  fonts-dejavu-core
+  ffmpeg fonts-dejavu-core git \
+  sway seatd libdrm-tests
 
 echo ""
-echo "--- [2/7] Building project ---"
+echo "--- [2/7] Build ---"
 mkdir -p "$PROJECT_DIR/build"
 cd "$PROJECT_DIR/build"
-# Wyse Celeron = x86-64-v2 (bez AVX); unikamy note ISA v3 z nowszych toolchainow.
 cmake .. -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-march=x86-64-v2 -mtune=generic"
-make -j"$(nproc)"
-# Usun note.gnu.property jesli linker nadal oznaczyl v3 (glibc odrzuca binarke).
+cmake --build . -j"$(nproc)"
 if command -v objcopy >/dev/null 2>&1; then
   objcopy --remove-section=.note.gnu.property tvbox_gui tvbox_gui.stripped 2>/dev/null \
-    && mv tvbox_gui.stripped tvbox_gui \
-    || true
+    && mv tvbox_gui.stripped tvbox_gui || true
 fi
 cd "$PROJECT_DIR"
 
 echo ""
-echo "--- [3/7] Creating install directories ---"
-mkdir -p "$INSTALL_DIR/bin"
-mkdir -p "$INSTALL_DIR/config"
-mkdir -p "$INSTALL_DIR/data/videos"
-mkdir -p "$INSTALL_DIR/assets/fonts"
-mkdir -p "$INSTALL_DIR/assets/backgrounds"
+echo "--- [3/7] Install dirs ---"
+mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/config" \
+  "$INSTALL_DIR/data/videos" "$INSTALL_DIR/assets/fonts" "$INSTALL_DIR/assets/backgrounds"
 
 echo ""
-echo "--- [4/7] Installing files ---"
+echo "--- [4/7] Install files ---"
 cp "$PROJECT_DIR/build/tvbox_gui" "$INSTALL_DIR/bin/tvbox_gui"
-
-if [ ! -f "$INSTALL_DIR/config/app-wyse.yaml" ]; then
-  cp "$PROJECT_DIR/config/app-wyse.yaml" "$INSTALL_DIR/config/app-wyse.yaml"
-  echo "Installed default config (app-wyse.yaml)"
-else
-  echo "Config already exists, skipping (check for new options in source config)"
-fi
+chmod +x "$INSTALL_DIR/bin/tvbox_gui"
+cp "$PROJECT_DIR/config/app-wyse.yaml" "$INSTALL_DIR/config/app-wyse.yaml"
+cp "$PROJECT_DIR/config/sway-kiosk.conf" "$INSTALL_DIR/config/sway-kiosk.conf"
+cp "$PROJECT_DIR/scripts/tvbox-kiosk-run.sh" "$INSTALL_DIR/bin/tvbox-kiosk-run.sh"
+chmod +x "$INSTALL_DIR/bin/tvbox-kiosk-run.sh"
+sed -i 's/\r$//' "$INSTALL_DIR/bin/tvbox-kiosk-run.sh" "$INSTALL_DIR/config/sway-kiosk.conf" || true
 
 FONT_SRC="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_DST="$INSTALL_DIR/assets/fonts/DejaVuSans.ttf"
-if [ -f "$FONT_SRC" ] && [ ! -f "$FONT_DST" ]; then
-  cp "$FONT_SRC" "$FONT_DST"
-  echo "Installed font"
-elif [ -f "$PROJECT_DIR/assets/fonts/DejaVuSans.ttf" ] && [ ! -f "$FONT_DST" ]; then
-  cp "$PROJECT_DIR/assets/fonts/DejaVuSans.ttf" "$FONT_DST"
-  echo "Installed font from project assets"
-fi
+[ -f "$FONT_SRC" ] && cp "$FONT_SRC" "$FONT_DST"
 
 echo ""
-echo "--- [5/7] Setting permissions ---"
-sudo usermod -aG video,dialout,render,input "$SERVICE_USER" 2>/dev/null || true
+echo "--- [5/7] Groups / seatd ---"
+sudo usermod -aG video,dialout,render,input "$SERVICE_USER"
+sudo systemctl enable --now seatd.service 2>/dev/null || true
+sudo tee /etc/udev/rules.d/99-tvbox-serial.rules >/dev/null <<'EOF'
+KERNEL=="ttyUSB*", MODE="0660", GROUP="dialout"
+KERNEL=="ttyACM*", MODE="0660", GROUP="dialout"
+EOF
+sudo udevadm control --reload-rules 2>/dev/null || true
 
 echo ""
-echo "--- [6/7] Installing systemd service ---"
-sudo cp "$PROJECT_DIR/scripts/tvbox-wyse.service" /etc/systemd/system/${SERVICE_NAME}.service
+echo "--- [6/7] systemd ---"
+systemctl --user stop tvbox 2>/dev/null || true
+sudo cp "$PROJECT_DIR/scripts/tvbox-kiosk.service" /etc/systemd/system/${SERVICE_NAME}.service
 sudo systemctl daemon-reload
 sudo systemctl enable ${SERVICE_NAME}.service
-echo "Service ${SERVICE_NAME} enabled"
+sudo systemctl disable getty@tty1.service 2>/dev/null || true
 
 echo ""
-echo "--- [7/7] Starting service ---"
+echo "--- [7/7] Start ---"
 sudo systemctl restart ${SERVICE_NAME}.service
-sleep 2
+sleep 3
 sudo systemctl status ${SERVICE_NAME}.service --no-pager || true
 
 echo ""
-echo "=== Deployment complete ==="
-echo "Logs:    sudo journalctl -u ${SERVICE_NAME} -f"
-echo "Stop:    sudo systemctl stop ${SERVICE_NAME}"
-echo "Restart: sudo systemctl restart ${SERVICE_NAME}"
+echo "=== Done ==="
+echo "Logs: sudo journalctl -u ${SERVICE_NAME} -f"
+echo "Jesli obraz do gory nogami: w config/sway-kiosk.conf zmien transform 270 -> 90"

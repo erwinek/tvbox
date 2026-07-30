@@ -1,11 +1,13 @@
-# Produkcja: Dell Wyse (Ubuntu + GNOME Wayland), monitor 4K portrait
+# Produkcja: Dell Wyse (Ubuntu Server + SDL KMS/DRM), monitor 4K
 serial_port: "/dev/ttyUSB0"
 baud_rate: 115200
-# Design-space 4K portrait; fullscreen bierze tryb desktopu (po rotacji GNOME).
-window_width: 2160
-window_height: 3840
+# Design-space Full HD portrait (po sway transform 90 z 1920x1080).
+window_width: 1080
+window_height: 1920
 fullscreen: true
+# Kiosk: Sway robi rotacje HW (i915); SDL na Wayland bez software rotate.
 use_kms: false
+display_rotate: 0
 layout_scale: auto
 
 assets_dir: "assets"

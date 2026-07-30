@@ -110,6 +110,14 @@ Config LoadConfig(const std::string& path) {
     if (map.count("display_height")) cfg.display_height = std::stoi(map["display_height"]);
     if (map.count("fullscreen")) cfg.fullscreen = ParseBool(map["fullscreen"]);
     if (map.count("use_kms")) cfg.use_kms = ParseBool(map["use_kms"]);
+    if (map.count("display_rotate")) {
+        int rot = std::stoi(map["display_rotate"]);
+        rot %= 360;
+        if (rot < 0) rot += 360;
+        if (rot == 0 || rot == 90 || rot == 180 || rot == 270) {
+            cfg.display_rotate = rot;
+        }
+    }
     if (map.count("layout_scale")) {
         const std::string v = map["layout_scale"];
         if (v != "auto" && !v.empty()) {

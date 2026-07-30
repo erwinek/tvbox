@@ -30,12 +30,51 @@ SDL_Color RowColor(int line) {
 
 }  // namespace
 
+LeaderboardWidget::~LeaderboardWidget() {
+    ClearRowCache();
+}
+
 void LeaderboardWidget::Invalidate() {
     clips_.clear();
+    ClearRowCache();
     scroll_px_ = 0.f;
     scroll_dir_ = 1;
     last_scroll_ms_ = 0;
     pause_until_ms_ = 0;
+}
+
+void LeaderboardWidget::ClearRowCache() {
+    for (auto& row : row_cache_) {
+        if (row.rank_tex) SDL_DestroyTexture(row.rank_tex);
+        if (row.score_tex) SDL_DestroyTexture(row.score_tex);
+        row.rank_tex = nullptr;
+        row.score_tex = nullptr;
+    }
+    row_cache_.clear();
+}
+
+void LeaderboardWidget::RebuildRowCache(ui::Renderer& renderer,
+                                        const std::vector<ui::ScoreEntry>& entries) {
+    ClearRowCache();
+    row_cache_.resize(entries.size());
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+        RowCache& row = row_cache_[i];
+        row.color = RowColor(static_cast<int>(i));
+
+        const std::string rank = std::to_string(i + 1) + ".";
+        SDL_Point sz = renderer.MeasureText(rank, ui::FontSize::Normal);
+        row.rank_w = sz.x;
+        row.rank_h = sz.y;
+        row.rank_tex = renderer.CreateTextTexture(rank, ui::FontSize::Normal, row.color,
+                                                  &row.rank_w, &row.rank_h);
+
+        const std::string score = std::to_string(entries[i].score);
+        SDL_Point sz2 = renderer.MeasureText(score, ui::FontSize::Large);
+        row.score_w = sz2.x;
+        row.score_h = sz2.y;
+        row.score_tex = renderer.CreateTextTexture(score, ui::FontSize::Large, row.color,
+                                                   &row.score_w, &row.score_h);
+    }
 }
 
 ui::FrameSequencePlayer& LeaderboardWidget::GetClip(ui::Renderer& renderer,
@@ -137,6 +176,11 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
     const int rank_text_h = rank_text_h_;
     const int score_text_h = score_text_h_;
 
+    // Cache tekstur wierszy (rank + score) — odswiezamy gdy zmieni sie lista.
+    if (row_cache_.size() != entries.size()) {
+        RebuildRowCache(renderer, entries);
+    }
+
     const int rows_y = area.y + rows_start;
     const SDL_Rect clip_design{area.x, rows_y, area.w, rows_h};
     const SDL_Rect clip_screen = lay.Rect(clip_design.x, clip_design.y, clip_design.w, clip_design.h);
@@ -158,16 +202,21 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
         const int content_y = row_y + (row_h - thumb_h) / 2;
 
         const SDL_Color color = RowColor(line);
+        const RowCache& rc = row_cache_[static_cast<std::size_t>(line)];
 
         const Uint8 row_alpha = static_cast<Uint8>(line % 2 == 0 ? 12 : 4);
-        renderer.FillRoundedRect(
+        renderer.FillRect(
             SDL_Rect{area.x + row_pad_x, row_y - 2, area.w - 2 * row_pad_x, row_h - 6},
-            lay.PM(0.009f), SDL_Color{255, 255, 255, row_alpha});
+            SDL_Color{255, 255, 255, row_alpha});
 
-        const std::string rank = std::to_string(line + 1) + ".";
-        const int rank_y = row_y + (row_h - rank_text_h) / 2;
-        renderer.DrawText(rank, ui::FontSize::Normal, color, area.x + rank_x, rank_y, false, 255,
-                          1.0f, 1);
+        // Rank z cache tekstury — bez TTF_Render co klatke.
+        if (rc.rank_tex) {
+            const int rank_y = row_y + (row_h - rc.rank_h) / 2;
+            const float fs = lay.FontScale();
+            SDL_Rect dst{lay.X(area.x + rank_x), lay.Y(rank_y), static_cast<int>(rc.rank_w * fs),
+                         static_cast<int>(rc.rank_h * fs)};
+            SDL_RenderCopy(renderer.sdl(), rc.rank_tex, nullptr, &dst);
+        }
 
         int score_x = area.x + rank_x + rank_col_w;
         bool has_clip = false;
@@ -198,9 +247,14 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
         }
 
         // Wynik wiekszym fontem (jak INSERT COIN), numer zostaje Normal.
-        const int score_y = row_y + (row_h - score_text_h) / 2;
-        renderer.DrawText(std::to_string(entry.score), ui::FontSize::Large, color, score_x,
-                          score_y, false, 255, 1.0f, 1);
+        // Wynik z cache tekstury — bez TTF_Render co klatke.
+        if (rc.score_tex) {
+            const int score_y = row_y + (row_h - rc.score_h) / 2;
+            const float fs = lay.FontScale();
+            SDL_Rect dst{lay.X(score_x), lay.Y(score_y), static_cast<int>(rc.score_w * fs),
+                         static_cast<int>(rc.score_h * fs)};
+            SDL_RenderCopy(renderer.sdl(), rc.score_tex, nullptr, &dst);
+        }
     }
 
     SDL_RenderSetClipRect(renderer.sdl(), nullptr);
