@@ -26,9 +26,10 @@ namespace ui {
 
 namespace {
 
-// Male okienko — niska rozdzielczosc dekodowania (CPU).
-constexpr int kDecodeW = 360;
-constexpr int kDecodeH = 640;
+// Male okienko — bardzo niska rozdzielczosc + 10 fps (Wyse: unikac 100% CPU).
+constexpr int kDecodeW = 240;
+constexpr int kDecodeH = 426;
+constexpr int kDecodeFps = 10;
 constexpr int kBytesPerPixel = 3;  // rgb24
 
 std::string NullDevice() {
@@ -78,7 +79,19 @@ void BackgroundPlayer::Init(const std::string& background_dir) {
             clips_.push_back(entry.path().string());
         }
     }
-    std::sort(clips_.begin(), clips_.end());
+    // Preferuj najmniejszy plik (low-res loop) — dekodowanie HD zjada CPU na Wyse.
+    std::sort(clips_.begin(), clips_.end(), [](const std::string& a, const std::string& b) {
+        std::error_code eca, ecb;
+        const auto sa = std::filesystem::file_size(a, eca);
+        const auto sb = std::filesystem::file_size(b, ecb);
+        if (eca || ecb) {
+            return a < b;
+        }
+        if (sa != sb) {
+            return sa < sb;
+        }
+        return a < b;
+    });
 
     if (clips_.empty()) {
         util::Log(util::LogLevel::Info, "BackgroundPlayer: brak filmow w " + background_dir);
@@ -139,12 +152,15 @@ bool BackgroundPlayer::StartClip(const std::string& path) {
         frame_ready_ = false;
     }
 
-    // -re: tempo realtime; niska rozdzielczosc; bez audio.
+    // -re + 1 watek + fast scale: zrodlo powinno byc juz low-res (patrz assets).
     std::ostringstream cmd;
-    cmd << "ffmpeg -hide_banner -loglevel error -re -stream_loop -1 -i \"" << path << "\""
-        << " -an -vf \"scale=" << frame_w_ << ":" << frame_h_
-        << ":force_original_aspect_ratio=increase,crop=" << frame_w_ << ":" << frame_h_ << "\""
-        << " -r 20 -f rawvideo -pix_fmt rgb24 -"
+    cmd << "ffmpeg -hide_banner -loglevel error -nostdin -threads 1 -filter_threads 1"
+        << " -re -stream_loop -1 -i \"" << path << "\""
+        << " -an -vf \"fps=" << kDecodeFps
+        << ",scale=" << frame_w_ << ":" << frame_h_
+        << ":flags=fast_bilinear:force_original_aspect_ratio=increase,crop=" << frame_w_ << ":"
+        << frame_h_ << "\""
+        << " -f rawvideo -pix_fmt rgb24 -"
         << " 2>" << NullDevice();
 
     pipe_ = TVBOX_POPEN(cmd.str().c_str(), TVBOX_POPEN_MODE);

@@ -46,6 +46,9 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/config" \
 
 echo ""
 echo "--- [4/7] Install files ---"
+# Zatrzymaj usluge zanim nadpiszemy binarke (cp: Text file busy).
+sudo systemctl stop ${SERVICE_NAME}.service 2>/dev/null || true
+sleep 1
 cp "$PROJECT_DIR/build/tvbox_gui" "$INSTALL_DIR/bin/tvbox_gui"
 chmod +x "$INSTALL_DIR/bin/tvbox_gui"
 cp "$PROJECT_DIR/config/app-wyse.yaml" "$INSTALL_DIR/config/app-wyse.yaml"
@@ -54,6 +57,11 @@ cp "$PROJECT_DIR/scripts/tvbox-kiosk-run.sh" "$INSTALL_DIR/bin/tvbox-kiosk-run.s
 chmod +x "$INSTALL_DIR/bin/tvbox-kiosk-run.sh"
 sed -i 's/\r$//' "$INSTALL_DIR/bin/tvbox-kiosk-run.sh" "$INSTALL_DIR/config/sway-kiosk.conf" || true
 [ -f "$PROJECT_DIR/build/drm_rotate_probe" ] && cp "$PROJECT_DIR/build/drm_rotate_probe" "$INSTALL_DIR/bin/"
+# Low-res klipy tla (ModeSelect) — bez tego ffmpeg dekoduje stare HD i zjada CPU.
+if [[ -d "$PROJECT_DIR/assets/backgrounds" ]]; then
+  mkdir -p "$INSTALL_DIR/assets/backgrounds"
+  cp -f "$PROJECT_DIR/assets/backgrounds/"*.mp4 "$INSTALL_DIR/assets/backgrounds/" 2>/dev/null || true
+fi
 
 FONT_SRC="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_DST="$INSTALL_DIR/assets/fonts/DejaVuSans.ttf"

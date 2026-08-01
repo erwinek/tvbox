@@ -4,7 +4,7 @@
 
 namespace screens {
 
-// GAME_START: czekamy na Start na PGM. Male okienko wideo + napis Press Start.
+// GAME_START: czekamy na Start na PGM. Napis Boxer / wideo / napis Kicker.
 class ModeSelectScreen : public core::Screen {
 public:
     void OnEnter(core::AppContext& ctx) override;
