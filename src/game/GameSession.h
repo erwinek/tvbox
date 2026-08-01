@@ -19,6 +19,7 @@ public:
 
     int selected_index() const { return selected_; }
     void MoveSelection(int direction);
+    bool SelectModeById(const std::string& id);
     const GameMode& selected_mode() const;
 
     // Rozpoczyna gre: konsumuje kredyt, nadaje id gracza. Zwraca false gdy brak kredytu.

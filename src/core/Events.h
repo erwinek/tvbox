@@ -7,7 +7,8 @@ namespace core {
 enum class InputType {
     Coin,        // wrzucony kredyt
     SelectMode,  // zmiana wyboru trybu (value = kierunek -1/+1)
-    Confirm,     // zatwierdzenie / start
+    Confirm,     // zatwierdzenie / start (dev/klawiatura)
+    Start,       // START z PGM: text = mode id (boxer|kopacz|hammer)
     Back,        // cofnij
     Hit,         // uderzenie (value = zmierzona sila, <=0 => symulacja; text = player id)
     Quit,        // wyjscie z aplikacji

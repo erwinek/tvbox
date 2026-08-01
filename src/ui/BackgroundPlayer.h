@@ -8,13 +8,14 @@
 #include <vector>
 
 struct SDL_Texture;
+struct SDL_Rect;
 
 namespace ui {
 
 class Renderer;
 
-// Odtwarza filmy z katalogu (mp4/mkv/webm/avi) w petli jako tlo UI.
-// Dekodowanie przez ffmpeg CLI -> surowe RGB24 do tekstury SDL.
+// Odtwarza film z katalogu (mp4/...) — uzywany jako male okienko (np. ekran Press Start).
+// Dekodowanie przez ffmpeg CLI -> RGB24. Start dopiero po SetPlaying(true).
 class BackgroundPlayer {
 public:
     BackgroundPlayer() = default;
@@ -26,8 +27,12 @@ public:
     void Init(const std::string& background_dir);
     void Shutdown();
 
-    // Rysuje aktualna klatke na caly design-space. false = brak tla.
-    bool Render(Renderer& renderer);
+    // Wlacza/wylacza ffmpeg (oszczedza CPU gdy ekran nie potrzebuje wideo).
+    void SetPlaying(bool playing);
+    bool IsPlaying() const { return playing_; }
+
+    // Rysuje aktualna klatke w dst (wymagane). false = brak klatki / nie gra.
+    bool Render(Renderer& renderer, const SDL_Rect& dst);
 
 private:
     void ReaderLoop();
@@ -38,6 +43,7 @@ private:
 
     std::vector<std::string> clips_;
     std::size_t clip_index_ = 0;
+    bool playing_ = false;
 
     std::thread reader_thread_;
     std::atomic<bool> stop_{false};

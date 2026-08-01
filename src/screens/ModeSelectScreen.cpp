@@ -8,16 +8,41 @@
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
 
+#include <cmath>
+
 namespace screens {
 
+namespace {
+
+std::optional<core::GameState> TryStartFromPgm(core::AppContext& ctx, const std::string& mode_id) {
+    if (!mode_id.empty()) {
+        ctx.session->SelectModeById(mode_id);
+    }
+    if (ctx.session->StartGame()) {
+        if (ctx.audio) {
+            ctx.audio->PlaySound("select");
+        }
+        return core::GameState::Measure;
+    }
+    return std::nullopt;
+}
+
+}  // namespace
+
 void ModeSelectScreen::OnEnter(core::AppContext& ctx) {
-    (void)ctx;
-    idle_ms_ = 0.0;
+    if (ctx.background) {
+        ctx.background->SetPlaying(true);
+    }
+}
+
+void ModeSelectScreen::OnExit(core::AppContext& ctx) {
+    if (ctx.background) {
+        ctx.background->SetPlaying(false);
+    }
 }
 
 std::optional<core::GameState> ModeSelectScreen::HandleEvent(const core::InputEvent& event,
                                                              core::AppContext& ctx) {
-    idle_ms_ = 0.0;
     switch (event.type) {
         case core::InputType::Coin:
             ctx.session->credits().Add();
@@ -25,28 +50,23 @@ std::optional<core::GameState> ModeSelectScreen::HandleEvent(const core::InputEv
                 ctx.audio->PlaySound("coin");
             }
             return std::nullopt;
-        case core::InputType::SelectMode:
-            ctx.session->MoveSelection(event.value);
-            if (ctx.audio) {
-                ctx.audio->PlaySound("select");
-            }
-            return std::nullopt;
+        case core::InputType::Start:
+            return TryStartFromPgm(ctx, event.text);
         case core::InputType::Confirm:
-            if (ctx.session->StartGame()) {
-                return core::GameState::Measure;
+            return TryStartFromPgm(ctx, ctx.session->selected_mode().id);
+        case core::InputType::Back:
+            if (!ctx.session->credits().Has()) {
+                return core::GameState::Attract;
             }
             return std::nullopt;
-        case core::InputType::Back:
-            return core::GameState::Attract;
         default:
             return std::nullopt;
     }
 }
 
 std::optional<core::GameState> ModeSelectScreen::Update(core::AppContext& ctx, double dt_ms) {
-    (void)ctx;
-    idle_ms_ += dt_ms;
-    if (idle_ms_ >= kIdleTimeoutMs) {
+    (void)dt_ms;
+    if (!ctx.session->credits().Has()) {
         return core::GameState::Attract;
     }
     return std::nullopt;
@@ -56,43 +76,30 @@ void ModeSelectScreen::Render(core::AppContext& ctx) {
     ui::Renderer& r = *ctx.renderer;
     const ui::Layout& lay = r.layout();
     const int cx = lay.CenterX();
+    const Uint32 elapsed = r.ticks();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
-    const bool has_bg = ctx.background && ctx.background->Render(r);
-    const Uint8 grad_a = has_bg ? 170 : 255;
-    r.DrawVerticalGradient(SDL_Color{30, 24, 56, grad_a}, SDL_Color{8, 6, 16, grad_a});
+    r.DrawVerticalGradient(SDL_Color{26, 28, 56, 255}, SDL_Color{6, 7, 16, 255});
     const int header_h = ui::widgets::RenderHeader(r);
 
-    const int title_y = header_h + lay.PH(0.05f);
-    r.DrawText("WYBIERZ TRYB", ui::FontSize::Large, SDL_Color{255, 215, 0, 255}, cx, title_y,
-               true, 255, 1.0f, 3);
-
-    // Przyciski: szersze w pionie (70% szer.), wezsze w poziomie (30%).
-    const int btn_w = lay.PW(lay.IsPortrait() ? 0.70f : 0.30f);
-    const int btn_h = lay.PH(lay.IsPortrait() ? 0.065f : 0.09f);
-    const int btn_gap = lay.PH(lay.IsPortrait() ? 0.018f : 0.026f);
-    const int title_h = r.MeasureText("WYBIERZ TRYB", ui::FontSize::Large).y;
-
-    const auto& modes = ctx.session->modes();
-    const int selected = ctx.session->selected_index();
-    int y = title_y + title_h + lay.PH(0.04f);
-    for (int i = 0; i < static_cast<int>(modes.size()); ++i) {
-        const bool active = (i == selected);
-        const SDL_Rect btn{cx - btn_w / 2, y, btn_w, btn_h};
-        if (active) {
-            r.Panel(btn, lay.PM(0.019f), SDL_Color{40, 90, 60, 165}, SDL_Color{100, 255, 150, 210});
-        } else {
-            r.Panel(btn, lay.PM(0.019f), SDL_Color{22, 24, 46, 110}, SDL_Color{70, 80, 150, 120});
-        }
-        SDL_Color color = active ? SDL_Color{180, 255, 200, 255} : SDL_Color{180, 185, 205, 255};
-        const int label_h = r.MeasureText(modes[i].name, ui::FontSize::Large).y;
-        r.DrawText(modes[i].name, ui::FontSize::Large, color, cx, y + (btn_h - label_h) / 2, true,
-                   255, 1.0f, 2);
-        y += btn_h + btn_gap;
+    // Male okienko wideo 9:16 pod naglowkiem (nie pelny ekran).
+    const int vid_h = lay.PH(0.48f);
+    const int vid_w = (vid_h * 9) / 16;
+    const int vid_y = header_h + lay.PH(0.035f);
+    const SDL_Rect video{cx - vid_w / 2, vid_y, vid_w, vid_h};
+    r.Panel(SDL_Rect{video.x - 4, video.y - 4, video.w + 8, video.h + 8}, lay.PM(0.01f),
+            SDL_Color{0, 0, 0, 180}, SDL_Color{255, 255, 255, 40});
+    if (!(ctx.background && ctx.background->Render(r, video))) {
+        r.FillRect(video, SDL_Color{20, 20, 28, 255});
     }
 
-    r.DrawText("strzalki = wybor    ENTER = start", ui::FontSize::Small,
-               SDL_Color{160, 165, 190, 255}, cx, r.height() - lay.PH(0.083f), true);
+    const int prompt_y = video.y + video.h + lay.PH(0.04f);
+    // Plynne pojawianie/znikanie (~2.5 s cykl).
+    const float pulse =
+        0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * (2.0f * 3.14159265f / 2500.0f));
+    const Uint8 alpha = static_cast<Uint8>(35 + static_cast<int>(pulse * 220));
+    r.DrawText("Press Start for Boxer or Kicker", ui::FontSize::Large,
+               SDL_Color{255, 215, 0, 255}, cx, prompt_y, true, alpha, 1.0f, 3);
 
     ui::widgets::RenderHud(r, ctx.session->credits().count(), ctx.leaderboard);
     r.EndFrame();

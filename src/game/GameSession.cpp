@@ -21,6 +21,16 @@ void GameSession::MoveSelection(int direction) {
     selected_ = ((selected_ + direction) % n + n) % n;
 }
 
+bool GameSession::SelectModeById(const std::string& id) {
+    for (int i = 0; i < static_cast<int>(modes_.size()); ++i) {
+        if (modes_[i].id == id) {
+            selected_ = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 const GameMode& GameSession::selected_mode() const {
     if (modes_.empty()) {
         return kFallback;

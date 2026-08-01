@@ -39,6 +39,14 @@ std::optional<core::InputEvent> ParseLine(const std::string& line) {
         return e;
     }
 
+    if (head == "START" && parts.size() >= 2) {
+        core::InputEvent e{};
+        e.type = core::InputType::Start;
+        e.text = parts[1];
+        e.ts = core::NowMs();
+        return e;
+    }
+
     if (head == "SCORE" && parts.size() >= 4) {
         core::InputEvent e{};
         e.type = core::InputType::Hit;

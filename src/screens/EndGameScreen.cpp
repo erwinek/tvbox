@@ -3,7 +3,6 @@
 #include "core/AppContext.h"
 #include "game/GameSession.h"
 #include "media/AudioPlayer.h"
-#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
@@ -55,9 +54,7 @@ void EndGameScreen::Render(core::AppContext& ctx) {
     const int h = r.height();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
-    const bool has_bg = ctx.background && ctx.background->Render(r);
-    const Uint8 grad_a = has_bg ? 170 : 255;
-    r.DrawVerticalGradient(SDL_Color{24, 30, 56, grad_a}, SDL_Color{6, 7, 16, grad_a});
+    r.DrawVerticalGradient(SDL_Color{24, 30, 56, 255}, SDL_Color{6, 7, 16, 255});
     const int header_h = ui::widgets::RenderHeader(r);
     const int bottom_reserved = lay.PH(0.12f);  // HUD + scrollbar
 

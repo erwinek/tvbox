@@ -4,7 +4,6 @@
 #include "game/GameSession.h"
 #include "game/ScoreEngine.h"
 #include "media/AudioPlayer.h"
-#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
@@ -83,9 +82,7 @@ void MeasureScreen::Render(core::AppContext& ctx) {
     const int cy = lay.CenterY();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
-    const bool has_bg = ctx.background && ctx.background->Render(r);
-    const Uint8 grad_a = has_bg ? 170 : 255;
-    r.DrawVerticalGradient(SDL_Color{44, 18, 30, grad_a}, SDL_Color{8, 6, 16, grad_a});
+    r.DrawVerticalGradient(SDL_Color{44, 18, 30, 255}, SDL_Color{8, 6, 16, 255});
     const int header_h = ui::widgets::RenderHeader(r);
 
     const std::string mode = ctx.session->selected_mode().name;

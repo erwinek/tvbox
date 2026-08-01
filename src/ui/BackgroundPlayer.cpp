@@ -26,8 +26,9 @@ namespace ui {
 
 namespace {
 
-constexpr int kDecodeW = 1280;
-constexpr int kDecodeH = 720;
+// Male okienko — niska rozdzielczosc dekodowania (CPU).
+constexpr int kDecodeW = 360;
+constexpr int kDecodeH = 640;
 constexpr int kBytesPerPixel = 3;  // rgb24
 
 std::string NullDevice() {
@@ -85,13 +86,14 @@ void BackgroundPlayer::Init(const std::string& background_dir) {
     }
 
     util::Log(util::LogLevel::Info,
-              "BackgroundPlayer: " + std::to_string(clips_.size()) + " klip(ow) w " + background_dir);
+              "BackgroundPlayer: " + std::to_string(clips_.size()) +
+                  " klip(ow) (lazy start) w " + background_dir);
     clip_index_ = 0;
-    StartClip(clips_[clip_index_]);
+    // Nie startujemy ffmpeg tutaj — dopiero SetPlaying(true) na ekranie Press Start.
 }
 
 void BackgroundPlayer::Shutdown() {
-    StopClip();
+    SetPlaying(false);
     clips_.clear();
     clip_index_ = 0;
     {
@@ -105,6 +107,22 @@ void BackgroundPlayer::Shutdown() {
         tex_w_ = 0;
         tex_h_ = 0;
     }
+}
+
+void BackgroundPlayer::SetPlaying(bool playing) {
+    if (playing == playing_) {
+        return;
+    }
+    playing_ = playing;
+    if (!playing_) {
+        StopClip();
+        return;
+    }
+    if (clips_.empty()) {
+        playing_ = false;
+        return;
+    }
+    StartClip(clips_[clip_index_]);
 }
 
 bool BackgroundPlayer::StartClip(const std::string& path) {
@@ -121,12 +139,12 @@ bool BackgroundPlayer::StartClip(const std::string& path) {
         frame_ready_ = false;
     }
 
-    // Skalowanie + crop do 16:9, surowe RGB na stdout (bez dzwieku).
+    // -re: tempo realtime; niska rozdzielczosc; bez audio.
     std::ostringstream cmd;
     cmd << "ffmpeg -hide_banner -loglevel error -re -stream_loop -1 -i \"" << path << "\""
         << " -an -vf \"scale=" << frame_w_ << ":" << frame_h_
         << ":force_original_aspect_ratio=increase,crop=" << frame_w_ << ":" << frame_h_ << "\""
-        << " -f rawvideo -pix_fmt rgb24 -"
+        << " -r 20 -f rawvideo -pix_fmt rgb24 -"
         << " 2>" << NullDevice();
 
     pipe_ = TVBOX_POPEN(cmd.str().c_str(), TVBOX_POPEN_MODE);
@@ -155,7 +173,7 @@ void BackgroundPlayer::StopClip() {
 }
 
 void BackgroundPlayer::AdvanceClip() {
-    if (clips_.empty()) {
+    if (clips_.empty() || !playing_) {
         return;
     }
     clip_index_ = (clip_index_ + 1) % clips_.size();
@@ -194,13 +212,12 @@ void BackgroundPlayer::ReaderLoop() {
     }
 }
 
-bool BackgroundPlayer::Render(Renderer& renderer) {
-    if (clips_.empty()) {
+bool BackgroundPlayer::Render(Renderer& renderer, const SDL_Rect& dst) {
+    if (!playing_ || clips_.empty()) {
         return false;
     }
 
     if (clip_ended_.load() && !stop_.load()) {
-        // stream_loop -1 zwykle nie konczy; gdy jednak EOF — nastepny klip / restart.
         AdvanceClip();
     }
 
@@ -254,7 +271,6 @@ bool BackgroundPlayer::Render(Renderer& renderer) {
         return false;
     }
 
-    const SDL_Rect dst{0, 0, renderer.width(), renderer.height()};
     renderer.DrawTexture(texture_, dst);
     return true;
 }

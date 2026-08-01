@@ -3,7 +3,6 @@
 #include "core/AppContext.h"
 #include "game/GameSession.h"
 #include "media/AudioPlayer.h"
-#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
@@ -43,6 +42,15 @@ std::optional<core::GameState> AttractScreen::HandleEvent(const core::InputEvent
                 ctx.audio->StopMusic();
             }
             return core::GameState::ModeSelect;
+        case core::InputType::Start:
+            // Kredit juz byl (sync) albo coin w tej samej chwili — idz do wyboru/startu.
+            if (ctx.session->credits().Has()) {
+                if (ctx.audio) {
+                    ctx.audio->StopMusic();
+                }
+                return core::GameState::ModeSelect;
+            }
+            return std::nullopt;
         default:
             return std::nullopt;
     }
@@ -67,9 +75,7 @@ void AttractScreen::Render(core::AppContext& ctx) {
     const Uint32 t0 = SDL_GetTicks();
 
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
-    const bool has_bg = ctx.background && ctx.background->Render(r);
-    const Uint8 grad_a = has_bg ? 170 : 255;
-    r.DrawVerticalGradient(SDL_Color{26, 28, 56, grad_a}, SDL_Color{6, 7, 16, grad_a});
+    r.DrawVerticalGradient(SDL_Color{26, 28, 56, 255}, SDL_Color{6, 7, 16, 255});
 
     // Strefa czasteczek: pomiedzy headerem a dolnym paskiem.
     const int particle_min_y = lay.PH(0.13f);
