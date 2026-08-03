@@ -28,11 +28,32 @@ void EndGameScreen::OnEnter(core::AppContext& ctx) {
 std::optional<core::GameState> EndGameScreen::HandleEvent(const core::InputEvent& event,
                                                           core::AppContext& ctx) {
     if (event.type == core::InputType::Coin) {
-        ctx.session->credits().Add();
-        if (ctx.audio) {
+        const int prev = ctx.session->credits().count();
+        if (event.text == "abs") {
+            ctx.session->credits().Set(event.value);
+        } else {
+            ctx.session->credits().Add(event.value > 0 ? event.value : 1);
+        }
+        if (ctx.session->credits().count() > prev && ctx.audio) {
             ctx.audio->PlaySound("coin");
         }
-        return core::GameState::ModeSelect;
+        if (ctx.session->credits().Has()) {
+            return core::GameState::ModeSelect;
+        }
+        return core::GameState::Attract;
+    }
+    if (event.type == core::InputType::Start) {
+        // PGM juz w POMIAR (kolejna runda) — nie czekaj na timeout EndGame / ModeSelect.
+        if (!event.text.empty()) {
+            ctx.session->BeginRoundFromPgm(event.text);
+            if (ctx.audio) {
+                ctx.audio->PlaySound("select");
+            }
+            return core::GameState::Measure;
+        }
+        if (ctx.session->credits().Has()) {
+            return core::GameState::ModeSelect;
+        }
     }
     return std::nullopt;
 }
@@ -56,7 +77,7 @@ void EndGameScreen::Render(core::AppContext& ctx) {
     r.BeginFrame(SDL_Color{0, 0, 0, 255});
     r.DrawVerticalGradient(SDL_Color{24, 30, 56, 255}, SDL_Color{6, 7, 16, 255});
     const int header_h = ui::widgets::RenderHeader(r);
-    const int bottom_reserved = lay.PH(0.12f);  // HUD + scrollbar
+    const int bottom_reserved = lay.PH(0.16f);  // HUD (cyfra nad etykieta) + scrollbar
 
     // Pion: wynik, replay i ranking jeden pod drugim, wysrodkowane.
     // Poziom: lewa kolumna (wynik + replay), ranking w prawej kolumnie.

@@ -30,7 +30,9 @@ public:
 private:
     void RegisterScreens();
     void CommitScore(const std::string& player_id, int score);
+    void ApplySyncState(const core::InputEvent& event);
     void StartMeasureRecording();
+    void FreezeMeasureRecording();
     void ScheduleHitRecordingFinalize(const std::string& video_path);
     void CancelMeasureRecording();
     void PollRecordingFinalize();
@@ -57,6 +59,8 @@ private:
     long long last_sync_ms_ = 0;
     long long finalize_at_ms_ = 0;
     std::string pending_video_path_;
+    std::string committed_video_path_;  // sciezka ustawiona przy HIT (do CommitScore)
+    std::string last_pgm_phase_;        // ostatnia zastosowana faza ze STATE heartbeat
     bool hit_finalize_scheduled_ = false;
     std::thread capture_thread_;
 };

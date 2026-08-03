@@ -35,7 +35,7 @@ struct Config {
     // Katalog z filmami tla (mp4/mkv/...); puste klipy = brak tla wideo.
     std::string background_dir = "assets/backgrounds";
     int camera_duration_ms = 4000;
-    int camera_post_hit_ms = 1000;
+    int camera_post_hit_ms = 0;  // 0 = zamknij ring buffer zaraz po HIT
     std::string camera_command;
 
     std::string server_url;

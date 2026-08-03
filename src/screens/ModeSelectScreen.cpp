@@ -14,17 +14,13 @@ namespace screens {
 
 namespace {
 
-std::optional<core::GameState> TryStartFromPgm(core::AppContext& ctx, const std::string& mode_id) {
-    if (!mode_id.empty()) {
-        ctx.session->SelectModeById(mode_id);
+std::optional<core::GameState> EnterMeasureFromPgm(core::AppContext& ctx,
+                                                   const std::string& mode_id) {
+    ctx.session->BeginRoundFromPgm(mode_id);
+    if (ctx.audio) {
+        ctx.audio->PlaySound("select");
     }
-    if (ctx.session->StartGame()) {
-        if (ctx.audio) {
-            ctx.audio->PlaySound("select");
-        }
-        return core::GameState::Measure;
-    }
-    return std::nullopt;
+    return core::GameState::Measure;
 }
 
 }  // namespace
@@ -44,20 +40,32 @@ void ModeSelectScreen::OnExit(core::AppContext& ctx) {
 std::optional<core::GameState> ModeSelectScreen::HandleEvent(const core::InputEvent& event,
                                                              core::AppContext& ctx) {
     switch (event.type) {
-        case core::InputType::Coin:
-            ctx.session->credits().Add();
-            if (ctx.audio) {
+        case core::InputType::Coin: {
+            const int prev = ctx.session->credits().count();
+            if (event.text == "abs") {
+                ctx.session->credits().Set(event.value);
+            } else {
+                ctx.session->credits().Add(event.value > 0 ? event.value : 1);
+            }
+            if (ctx.session->credits().count() > prev && ctx.audio) {
                 ctx.audio->PlaySound("coin");
             }
             return std::nullopt;
+        }
         case core::InputType::Start:
-            return TryStartFromPgm(ctx, event.text);
+            // PGM: gruszka/kopacz otwarte → od razu ekran pomiaru (nie Press Start).
+            return EnterMeasureFromPgm(ctx, event.text);
         case core::InputType::Confirm:
-            return TryStartFromPgm(ctx, ctx.session->selected_mode().id);
-        case core::InputType::Back:
-            if (!ctx.session->credits().Has()) {
-                return core::GameState::Attract;
+            // Lokalny Enter (dev): wymaga kredytu.
+            if (ctx.session->StartGame()) {
+                if (ctx.audio) {
+                    ctx.audio->PlaySound("select");
+                }
+                return core::GameState::Measure;
             }
+            return std::nullopt;
+        case core::InputType::Back:
+            // Attract tylko na zyczenie / gdy PGM wysle STATE,attract.
             return std::nullopt;
         default:
             return std::nullopt;
@@ -65,10 +73,9 @@ std::optional<core::GameState> ModeSelectScreen::HandleEvent(const core::InputEv
 }
 
 std::optional<core::GameState> ModeSelectScreen::Update(core::AppContext& ctx, double dt_ms) {
+    (void)ctx;
     (void)dt_ms;
-    if (!ctx.session->credits().Has()) {
-        return core::GameState::Attract;
-    }
+    // Nie wyrzucaj na Attract przy lokalnym !credits — STATE heartbeat z PGM trzyma sync.
     return std::nullopt;
 }
 

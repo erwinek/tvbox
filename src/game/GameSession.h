@@ -24,6 +24,10 @@ public:
 
     // Rozpoczyna gre: konsumuje kredyt, nadaje id gracza. Zwraca false gdy brak kredytu.
     bool StartGame();
+
+    // START z PGM: tryb + nowa runda. Kredyt synchronizuje CREDIT,<n> z PGM.
+    void BeginRoundFromPgm(const std::string& mode_id);
+
     const std::string& player_id() const { return player_id_; }
 
     void SetScore(int score) { score_ = score; }

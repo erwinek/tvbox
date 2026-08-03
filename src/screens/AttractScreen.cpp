@@ -33,17 +33,33 @@ std::optional<core::GameState> AttractScreen::HandleEvent(const core::InputEvent
     switch (event.type) {
         case core::InputType::Quit:
             return std::nullopt;
-        case core::InputType::Coin:
-            ctx.session->credits().Add();
-            if (ctx.audio) {
+        case core::InputType::Coin: {
+            const int prev = ctx.session->credits().count();
+            if (event.text == "abs") {
+                ctx.session->credits().Set(event.value);
+            } else {
+                ctx.session->credits().Add(event.value > 0 ? event.value : 1);
+            }
+            if (ctx.session->credits().count() > prev && ctx.audio) {
                 ctx.audio->PlaySound("coin");
             }
-            if (ctx.audio) {
-                ctx.audio->StopMusic();
+            if (ctx.session->credits().Has()) {
+                if (ctx.audio) {
+                    ctx.audio->StopMusic();
+                }
+                return core::GameState::ModeSelect;
             }
-            return core::GameState::ModeSelect;
+            return std::nullopt;
+        }
         case core::InputType::Start:
-            // Kredit juz byl (sync) albo coin w tej samej chwili — idz do wyboru/startu.
+            // START,<mode> z PGM = pomiar gotowy (gruszka/kopacz otwarte) → ekran 3.
+            if (!event.text.empty()) {
+                if (ctx.audio) {
+                    ctx.audio->StopMusic();
+                }
+                ctx.session->BeginRoundFromPgm(event.text);
+                return core::GameState::Measure;
+            }
             if (ctx.session->credits().Has()) {
                 if (ctx.audio) {
                     ctx.audio->StopMusic();
@@ -95,7 +111,7 @@ void AttractScreen::Render(core::AppContext& ctx) {
     }
 
     const int header_h = ui::widgets::RenderHeader(r);
-    const int bottom_reserved = lay.PH(0.10f);  // HUD + scrollbar; TOP SCORES ~5% krotsze
+    const int bottom_reserved = lay.PH(0.16f);  // wysoki HUD (cyfra nad RECORD/CREDIT) + scrollbar
 
     // Aranzacja: pion - panel u gory, ranking pod nim na szerokosc;
     // poziom - panel po lewej, ranking w prawej kolumnie.

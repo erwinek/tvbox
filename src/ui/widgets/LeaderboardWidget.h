@@ -37,7 +37,9 @@ private:
         SDL_Color color{200, 200, 210, 255};
     };
 
-    ui::FrameSequencePlayer& GetClip(ui::Renderer& renderer, const std::string& frames_dir);
+    ui::FrameSequencePlayer& EnsureClip(ui::Renderer& renderer, const std::string& frames_dir);
+    void PrefetchClips(ui::Renderer& renderer, const std::vector<ui::ScoreEntry>& entries,
+                       int first, int visible);
     void UpdateScroll(int total_rows, int visible_rows, int row_h, Uint32 now_ms);
     void ClearRowCache();
     void RebuildRowCache(ui::Renderer& renderer, const std::vector<ui::ScoreEntry>& entries);

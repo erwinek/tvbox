@@ -12,8 +12,8 @@ class Renderer;
 
 namespace ui::widgets {
 
-// HUD: RECORD (lewa) i CREDIT (prawa).
-// Gdy podano `align`, pillki sa wyrownane do lewej/prawej krawedzi (jak TOP SCORES).
+// HUD: RECORD / CREDIT — cyfra Huge nad etykieta Normal (wysrodkowane).
+// Gdy podano `align`, bloki sa wyrownane do lewej/prawej krawedzi (jak TOP SCORES).
 void RenderHud(ui::Renderer& renderer, int credits, const std::vector<ui::ScoreEntry>& leaderboard,
                const SDL_Rect* align = nullptr);
 

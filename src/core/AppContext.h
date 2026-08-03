@@ -45,6 +45,8 @@ struct AppContext {
     std::function<void(const std::string& player_id, int score)> commit_score;
     std::function<void()> start_measure_recording;
     std::function<void()> cancel_measure_recording;
+    // Zamknij ring buffer kamery natychmiast (moment uderzenia).
+    std::function<void()> freeze_measure_recording;
 };
 
 }  // namespace core

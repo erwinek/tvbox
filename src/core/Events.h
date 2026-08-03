@@ -5,12 +5,13 @@
 namespace core {
 
 enum class InputType {
-    Coin,        // wrzucony kredyt
+    Coin,        // wrzucony kredyt / CREDIT abs (text=abs)
     SelectMode,  // zmiana wyboru trybu (value = kierunek -1/+1)
     Confirm,     // zatwierdzenie / start (dev/klawiatura)
     Start,       // START z PGM: text = mode id (boxer|kopacz|hammer)
     Back,        // cofnij
-    Hit,         // uderzenie (value = zmierzona sila, <=0 => symulacja; text = player id)
+    Hit,         // uderzenie (value = zmierzona sila, <=0 => symulacja; text = player id | impact)
+    SyncState,   // STATE heartbeat: text = "phase:mode", value = credit
     Quit,        // wyjscie z aplikacji
     DebugGoto    // dev: wymuszone przejscie do stanu (value = numer stanu 1..4)
 };

@@ -91,6 +91,7 @@ bool App::Init() {
     };
     ctx_.start_measure_recording = [this]() { StartMeasureRecording(); };
     ctx_.cancel_measure_recording = [this]() { CancelMeasureRecording(); };
+    ctx_.freeze_measure_recording = [this]() { FreezeMeasureRecording(); };
 
     RegisterScreens();
 
@@ -133,7 +134,12 @@ void App::Run() {
                 running_ = false;
             } else if (event->type == core::InputType::DebugGoto) {
                 fsm_.GoTo(StateFromDebug(event->value), ctx_);
+            } else if (event->type == core::InputType::SyncState) {
+                ApplySyncState(*event);
             } else {
+                if (event->type == core::InputType::Start && !event->text.empty()) {
+                    last_pgm_phase_ = "measure";
+                }
                 fsm_.HandleEvent(*event, ctx_);
             }
         }
@@ -184,17 +190,49 @@ void App::Run() {
     }
 }
 
+void App::ApplySyncState(const core::InputEvent& event) {
+    // text = "phase:mode" (np. measure:boxer), value = credit
+    std::string phase = event.text;
+    std::string mode;
+    const auto colon = event.text.find(':');
+    if (colon != std::string::npos) {
+        phase = event.text.substr(0, colon);
+        mode = event.text.substr(colon + 1);
+    }
+    session_.credits().Set(event.value);
+
+    if (phase == last_pgm_phase_) {
+        return;  // ta sama faza — tylko kredyt (powyzej)
+    }
+    last_pgm_phase_ = phase;
+
+    if (phase == "measure") {
+        if (!mode.empty()) {
+            session_.BeginRoundFromPgm(mode);
+        }
+        // Nie cofaj EndGame → Measure gdy PGM jeszcze konczy POMIAR (celebration):
+        // last_pgm_phase_ juz "measure" po START, wiec tu wchodzimy tylko przy zmianie fazy.
+        fsm_.GoTo(core::GameState::Measure, ctx_);
+        return;
+    }
+    if (phase == "gamestart") {
+        fsm_.GoTo(core::GameState::ModeSelect, ctx_);
+        return;
+    }
+    // attract (i nieznane)
+    fsm_.GoTo(core::GameState::Attract, ctx_);
+}
+
 void App::CommitScore(const std::string& player_id, int score) {
     const long long ts = core::NowMs();
     util::Log(util::LogLevel::Info,
               "Commit score=" + std::to_string(score) + " player=" + player_id);
 
-    std::string video_path;
-    if (!cfg_.camera_command.empty()) {
-        const std::string filename = "hit_" + std::to_string(ts) + ".mp4";
-        video_path = cfg_.video_dir + "/" + filename;
-        ScheduleHitRecordingFinalize(video_path);
+    // Nagranie zamykane w momencie HIT — tu tylko przypisz sciezke do rankingu.
+    if (committed_video_path_.empty() && !cfg_.camera_command.empty()) {
+        FreezeMeasureRecording();
     }
+    const std::string video_path = committed_video_path_;
 
     store::ScoreEntry entry{};
     entry.player_id = player_id;
@@ -217,6 +255,7 @@ void App::StartMeasureRecording() {
     hit_finalize_scheduled_ = false;
     finalize_at_ms_ = 0;
     pending_video_path_.clear();
+    committed_video_path_.clear();
 
     const bool ok = video_.StartRingBufferCapture(cfg_.camera_duration_ms);
     recording_ = ok;
@@ -225,8 +264,26 @@ void App::StartMeasureRecording() {
     }
 }
 
+void App::FreezeMeasureRecording() {
+    if (cfg_.camera_command.empty()) {
+        return;
+    }
+    if (hit_finalize_scheduled_) {
+        return;
+    }
+    if (!video_.IsRingBufferActive()) {
+        return;
+    }
+    const long long ts = core::NowMs();
+    const std::string filename = "hit_" + std::to_string(ts) + ".mp4";
+    const std::string video_path = cfg_.video_dir + "/" + filename;
+    ScheduleHitRecordingFinalize(video_path);
+}
+
 void App::ScheduleHitRecordingFinalize(const std::string& video_path) {
     pending_video_path_ = video_path;
+    committed_video_path_ = video_path;
+    // Domyslnie 0 — stop zaraz po uderzeniu (HIT), bez dogrywania post-hit.
     finalize_at_ms_ = core::NowMs() + cfg_.camera_post_hit_ms;
     hit_finalize_scheduled_ = true;
     util::Log(util::LogLevel::Info,

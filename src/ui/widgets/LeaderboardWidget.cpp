@@ -14,12 +14,17 @@ constexpr float kRowHFrac = 0.285f;  // ~3x wieksze wiersze (film + wynik)
 constexpr float kTitlePadFrac = 0.015f;
 constexpr float kRowPadXFrac = 0.011f;
 constexpr float kRowShiftXFrac = 0.018f;  // przesuniecie listy w prawo od krawedzi panelu
-constexpr float kRankColWFrac = 0.033f;
+constexpr float kRankColWFrac = 0.058f;  // miejsce na dwucyfrowy rank (np. "10.") przed klipem
 constexpr float kScoreGapFrac = 0.016f;
 constexpr float kRadiusFrac = 0.022f;
 
 // Auto-scroll: piksele na sekunde jako frakcja wiersza; pauza na koncach (ms).
 constexpr Uint32 kScrollPauseMs = 2000;
+
+// Prefetch: ile wierszy przed / za viewportem zaczac ladowac klipy.
+constexpr int kPrefetchAhead = 3;
+// Budzet klatek JPG na jedna klatke renderu (rozlozony load = brak stuttera).
+constexpr int kFrameLoadBudget = 12;
 
 SDL_Color RowColor(int line) {
     if (line == 0) return {255, 215, 0, 255};
@@ -47,8 +52,6 @@ void LeaderboardWidget::ClearRowCache() {
     for (auto& row : row_cache_) {
         if (row.rank_tex) SDL_DestroyTexture(row.rank_tex);
         if (row.score_tex) SDL_DestroyTexture(row.score_tex);
-        row.rank_tex = nullptr;
-        row.score_tex = nullptr;
     }
     row_cache_.clear();
 }
@@ -77,15 +80,68 @@ void LeaderboardWidget::RebuildRowCache(ui::Renderer& renderer,
     }
 }
 
-ui::FrameSequencePlayer& LeaderboardWidget::GetClip(ui::Renderer& renderer,
-                                                    const std::string& frames_dir) {
-    auto it = clips_.find(frames_dir);
-    if (it != clips_.end()) {
-        return it->second;
-    }
+ui::FrameSequencePlayer& LeaderboardWidget::EnsureClip(ui::Renderer& renderer,
+                                                       const std::string& frames_dir) {
     ui::FrameSequencePlayer& player = clips_[frames_dir];
-    player.Load(renderer.sdl(), frames_dir);
+    player.BeginLoad(renderer.sdl(), frames_dir);
     return player;
+}
+
+void LeaderboardWidget::PrefetchClips(ui::Renderer& renderer,
+                                      const std::vector<ui::ScoreEntry>& entries, int first,
+                                      int visible) {
+    const int total = static_cast<int>(entries.size());
+    if (total <= 0 || visible <= 0) {
+        return;
+    }
+
+    // Widoczne + zapas w kierunku scrolla (i lekki zapas w druga strone).
+    const int ahead = scroll_dir_ >= 0 ? kPrefetchAhead : 1;
+    const int behind = scroll_dir_ < 0 ? kPrefetchAhead : 1;
+    const int lo = std::max(0, first - behind);
+    const int hi = std::min(total, first + visible + ahead);
+
+    // Priorytet: najpierw wiersze wchodzace w viewport (kierunek scrolla).
+    auto pump_range = [&](int from, int to, int& budget) {
+        if (budget <= 0) {
+            return;
+        }
+        const int step = from <= to ? 1 : -1;
+        for (int i = from; step > 0 ? i <= to : i >= to; i += step) {
+            if (i < 0 || i >= total || budget <= 0) {
+                break;
+            }
+            const auto& entry = entries[static_cast<std::size_t>(i)];
+            if (!entry.frames_dir.empty()) {
+                ui::FrameSequencePlayer& clip = EnsureClip(renderer, entry.frames_dir);
+                if (clip.loading()) {
+                    const int before = clip.frame_count();
+                    clip.PumpLoad(std::min(budget, 4));
+                    budget -= std::max(0, clip.frame_count() - before);
+                    if (clip.loading() && clip.frame_count() == before) {
+                        // Koniec plikow / blad — budget i tak zuzyj 1, zeby nie petlic.
+                        --budget;
+                    }
+                }
+            }
+            if (!entry.thumb_path.empty()) {
+                renderer.textures().Get(entry.thumb_path);
+            }
+        }
+    };
+
+    int budget = kFrameLoadBudget;
+    if (scroll_dir_ >= 0) {
+        // W dol: najpierw dolna krawedz viewportu i dalej.
+        pump_range(first + visible - 1, hi - 1, budget);
+        pump_range(first, first + visible - 2, budget);
+        pump_range(first - 1, lo, budget);
+    } else {
+        // W gore: najpierw gorna krawedz i wyzej.
+        pump_range(first, lo, budget);
+        pump_range(first + 1, first + visible - 1, budget);
+        pump_range(first + visible, hi - 1, budget);
+    }
 }
 
 void LeaderboardWidget::UpdateScroll(int total_rows, int visible_rows, int row_h, Uint32 now_ms) {
@@ -107,10 +163,14 @@ void LeaderboardWidget::UpdateScroll(int total_rows, int visible_rows, int row_h
         return;
     }
 
-    const float dt_s = static_cast<float>(now_ms - last_scroll_ms_) / 1000.f;
+    float dt_s = static_cast<float>(now_ms - last_scroll_ms_) / 1000.f;
     last_scroll_ms_ = now_ms;
-    if (dt_s <= 0.f || dt_s > 0.25f) {
+    if (dt_s <= 0.f) {
         return;
+    }
+    // Po ciezszej klatce (load) nie gub ruchu — ogranicz dt zamiast skipowac.
+    if (dt_s > 0.05f) {
+        dt_s = 0.05f;
     }
 
     // Plinny scroll w pikselach: ~0.5 wiersza na sekunde.
@@ -173,8 +233,6 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
         rank_text_h_ = renderer.MeasureText("1.", ui::FontSize::Normal).y;
         score_text_h_ = renderer.MeasureText("0", ui::FontSize::Large).y;
     }
-    const int rank_text_h = rank_text_h_;
-    const int score_text_h = score_text_h_;
 
     // Cache tekstur wierszy (rank + score) — odswiezamy gdy zmieni sie lista.
     if (row_cache_.size() != entries.size()) {
@@ -190,6 +248,9 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
     const int first = static_cast<int>(scroll_px_ / static_cast<float>(row_h));
     const int y_shift = static_cast<int>(scroll_px_) - first * row_h;
 
+    // Doladuj klipy z wyprzedzeniem — nie czekamy az wiersz wejdzie w viewport.
+    PrefetchClips(renderer, entries, first, visible);
+
     // Rysuj visible+1 wierszy, zeby smooth scroll nie pokazywal pustki.
     const int draw_count = std::min(visible + 1, total - first);
     for (int i = 0; i < draw_count; ++i) {
@@ -201,7 +262,6 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
         const int row_y = rows_y + i * row_h - y_shift;
         const int content_y = row_y + (row_h - thumb_h) / 2;
 
-        const SDL_Color color = RowColor(line);
         const RowCache& rc = row_cache_[static_cast<std::size_t>(line)];
 
         const Uint8 row_alpha = static_cast<Uint8>(line % 2 == 0 ? 12 : 4);
@@ -222,13 +282,16 @@ void LeaderboardWidget::Render(ui::Renderer& renderer, const std::vector<ui::Sco
         bool has_clip = false;
 
         if (!entry.frames_dir.empty()) {
-            ui::FrameSequencePlayer& clip = GetClip(renderer, entry.frames_dir);
-            SDL_Texture* frame = clip.FrameAt(elapsed, clip_fps);
-            if (frame) {
-                SDL_Rect dst{score_x, content_y, thumb_w, thumb_h};
-                renderer.DrawTexture(frame, dst);
-                renderer.DrawRect(dst, SDL_Color{80, 80, 140, 180});
-                has_clip = true;
+            ui::FrameSequencePlayer& clip = EnsureClip(renderer, entry.frames_dir);
+            // Nie blokuj — jak nie ready, pokaz thumb; Pump robi PrefetchClips.
+            if (clip.valid()) {
+                SDL_Texture* frame = clip.FrameAt(elapsed, clip_fps);
+                if (frame) {
+                    SDL_Rect dst{score_x, content_y, thumb_w, thumb_h};
+                    renderer.DrawTexture(frame, dst);
+                    renderer.DrawRect(dst, SDL_Color{80, 80, 140, 180});
+                    has_clip = true;
+                }
             }
         }
 

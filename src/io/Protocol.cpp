@@ -32,9 +32,27 @@ std::optional<core::InputEvent> ParseLine(const std::string& line) {
 
     const std::string& head = parts[0];
 
-    if (head == "COIN" || head == "CREDIT") {
+    if (head == "COIN") {
         core::InputEvent e{};
         e.type = core::InputType::Coin;
+        e.value = 1;
+        e.ts = core::NowMs();
+        return e;
+    }
+
+    // CREDIT,<n> — absolutny stan z PGM (text=abs).
+    if (head == "CREDIT") {
+        core::InputEvent e{};
+        e.type = core::InputType::Coin;
+        e.text = "abs";
+        e.value = 0;
+        if (parts.size() >= 2) {
+            try {
+                e.value = std::stoi(parts[1]);
+            } catch (...) {
+                e.value = 0;
+            }
+        }
         e.ts = core::NowMs();
         return e;
     }
@@ -43,6 +61,15 @@ std::optional<core::InputEvent> ParseLine(const std::string& line) {
         core::InputEvent e{};
         e.type = core::InputType::Start;
         e.text = parts[1];
+        e.ts = core::NowMs();
+        return e;
+    }
+
+    if (head == "HIT") {
+        core::InputEvent e{};
+        e.type = core::InputType::Hit;
+        e.text = "impact";
+        e.value = 0;
         e.ts = core::NowMs();
         return e;
     }
@@ -61,6 +88,20 @@ std::optional<core::InputEvent> ParseLine(const std::string& line) {
         } catch (...) {
             e.ts = core::NowMs();
         }
+        return e;
+    }
+
+    // Heartbeat: STATE,<phase>,<mode>,<credit>
+    if (head == "STATE" && parts.size() >= 4) {
+        core::InputEvent e{};
+        e.type = core::InputType::SyncState;
+        e.text = parts[1] + ":" + parts[2];  // e.g. measure:boxer
+        try {
+            e.value = std::stoi(parts[3]);
+        } catch (...) {
+            e.value = 0;
+        }
+        e.ts = core::NowMs();
         return e;
     }
 

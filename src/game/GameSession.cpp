@@ -48,4 +48,14 @@ bool GameSession::StartGame() {
     return true;
 }
 
+void GameSession::BeginRoundFromPgm(const std::string& mode_id) {
+    if (!mode_id.empty()) {
+        SelectModeById(mode_id);
+    }
+    // Kredyt odejmuje PGM (CREDIT sync) — nie Consume lokalnie (rozjezdzalo Attract vs Press Start).
+    ++counter_;
+    player_id_ = "Player" + std::to_string(counter_);
+    score_ = 0;
+}
+
 }  // namespace game
