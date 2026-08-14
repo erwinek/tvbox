@@ -30,6 +30,32 @@ void AttractScreen::OnEnter(core::AppContext& ctx) {
 
 std::optional<core::GameState> AttractScreen::HandleEvent(const core::InputEvent& event,
                                                           core::AppContext& ctx) {
+    // Dialog kasowania danych: Enter wykonuje, kazdy inny klawisz anuluje
+    // (ale zdarzenie przechodzi dalej do normalnej obslugi).
+    if (purge_confirm_) {
+        if (event.type == core::InputType::Confirm) {
+            purge_confirm_ = false;
+            util::Log(util::LogLevel::Info, "Purge confirmed by keyboard");
+            if (ctx.purge_all_data) {
+                ctx.purge_all_data();
+            }
+            if (ctx.audio) {
+                ctx.audio->PlaySound("select");
+            }
+            return std::nullopt;
+        }
+        if (event.type == core::InputType::PurgeRequest) {
+            purge_confirm_ms_ = kPurgeConfirmTimeoutMs;  // V ponownie = przedluz dialog
+            return std::nullopt;
+        }
+        purge_confirm_ = false;  // dowolny inny klawisz = anuluj
+    } else if (event.type == core::InputType::PurgeRequest) {
+        purge_confirm_ = true;
+        purge_confirm_ms_ = kPurgeConfirmTimeoutMs;
+        util::Log(util::LogLevel::Info, "Purge confirm dialog opened");
+        return std::nullopt;
+    }
+
     switch (event.type) {
         case core::InputType::Quit:
             return std::nullopt;
@@ -74,7 +100,13 @@ std::optional<core::GameState> AttractScreen::HandleEvent(const core::InputEvent
 
 std::optional<core::GameState> AttractScreen::Update(core::AppContext& ctx, double dt_ms) {
     (void)ctx;
-    (void)dt_ms;
+    if (purge_confirm_) {
+        purge_confirm_ms_ -= dt_ms;
+        if (purge_confirm_ms_ <= 0.0) {
+            purge_confirm_ = false;
+            util::Log(util::LogLevel::Info, "Purge confirm dialog timed out");
+        }
+    }
     return std::nullopt;
 }
 
@@ -167,6 +199,30 @@ void AttractScreen::Render(core::AppContext& ctx) {
                    "Boxer Video  --  INSERT COIN  --  PLAY WITH ME  --  HIT HARDER!  --  ");
 
     const Uint32 t3 = SDL_GetTicks();
+
+    // Dialog serwisowy: kasowanie wszystkich rekordow i nagran.
+    if (purge_confirm_) {
+        r.FillRect(SDL_Rect{0, 0, w, h}, SDL_Color{0, 0, 0, 170});
+
+        const int dlg_w = lay.PW(0.72f);
+        const int dlg_h = lay.PH(0.30f);
+        const SDL_Rect dlg{lay.CenterX() - dlg_w / 2, lay.CenterY() - dlg_h / 2, dlg_w, dlg_h};
+        r.Panel(dlg, lay.PM(0.02f), SDL_Color{40, 8, 12, 245}, SDL_Color{220, 60, 60, 255});
+
+        const int dlg_cx = dlg.x + dlg.w / 2;
+        float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * 0.006f);
+        Uint8 warn_alpha = static_cast<Uint8>(160 + static_cast<int>(pulse * 95));
+
+        r.DrawText("DELETE ALL DATA?", ui::FontSize::Large, SDL_Color{255, 70, 60, 255}, dlg_cx,
+                   dlg.y + lay.PH(0.035f), true, warn_alpha, 1.0f, 3);
+        r.DrawText("Are you sure you want to delete all records and recordings?",
+                   ui::FontSize::Normal, SDL_Color{235, 235, 240, 255}, dlg_cx,
+                   dlg.y + dlg.h / 2 - lay.PH(0.01f), true);
+        r.DrawText("ENTER = confirm     any other key = cancel", ui::FontSize::Small,
+                   SDL_Color{255, 200, 90, 255}, dlg_cx,
+                   dlg.y + dlg.h - lay.PH(0.055f), true);
+    }
+
     r.EndFrame();
     const Uint32 t4 = SDL_GetTicks();
 

@@ -120,4 +120,15 @@ bool LeaderboardStore::MarkSynced(int id) {
     return ok;
 }
 
+bool LeaderboardStore::ClearAll() {
+    char* err = nullptr;
+    sqlite3_exec(reinterpret_cast<sqlite3*>(db_), "DELETE FROM scores;", nullptr, nullptr, &err);
+    if (err) {
+        util::Log(util::LogLevel::Warn, std::string("SQLite clear: ") + err);
+        sqlite3_free(err);
+        return false;
+    }
+    return true;
+}
+
 }  // namespace store

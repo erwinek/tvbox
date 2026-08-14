@@ -37,6 +37,7 @@ private:
     void CancelMeasureRecording();
     void PollRecordingFinalize();
     void RefreshLeaderboard();
+    void PurgeAllData();
 
     config::Config cfg_;
 

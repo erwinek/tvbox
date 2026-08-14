@@ -47,6 +47,8 @@ struct AppContext {
     std::function<void()> cancel_measure_recording;
     // Zamknij ring buffer kamery natychmiast (moment uderzenia).
     std::function<void()> freeze_measure_recording;
+    // Serwis: skasuj wszystkie rekordy rankingu i nagrania z dysku.
+    std::function<void()> purge_all_data;
 };
 
 }  // namespace core

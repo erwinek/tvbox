@@ -13,7 +13,8 @@ enum class InputType {
     Hit,         // uderzenie (value = zmierzona sila, <=0 => symulacja; text = player id | impact)
     SyncState,   // STATE heartbeat: text = "phase:mode", value = credit
     Quit,        // wyjscie z aplikacji
-    DebugGoto    // dev: wymuszone przejscie do stanu (value = numer stanu 1..4)
+    DebugGoto,   // dev: wymuszone przejscie do stanu (value = numer stanu 1..4)
+    PurgeRequest  // serwis: zadanie skasowania wszystkich rekordow i nagran (klawisz V)
 };
 
 struct InputEvent {

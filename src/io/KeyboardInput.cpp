@@ -44,6 +44,9 @@ std::optional<core::InputEvent> TranslateKey(const SDL_Event& event) {
         case SDLK_BACKSPACE:
             e.type = core::InputType::Back;
             return e;
+        case SDLK_v:
+            e.type = core::InputType::PurgeRequest;
+            return e;
         case SDLK_1:
         case SDLK_KP_1:
             e.type = core::InputType::DebugGoto;

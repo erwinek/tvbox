@@ -96,6 +96,7 @@ bool App::Init() {
     ctx_.start_measure_recording = [this]() { StartMeasureRecording(); };
     ctx_.cancel_measure_recording = [this]() { CancelMeasureRecording(); };
     ctx_.freeze_measure_recording = [this]() { FreezeMeasureRecording(); };
+    ctx_.purge_all_data = [this]() { PurgeAllData(); };
 
     RegisterScreens();
 
@@ -341,9 +342,38 @@ void App::PollRecordingFinalize() {
     });
 }
 
+void App::PurgeAllData() {
+    util::Log(util::LogLevel::Info, "Purge all data requested");
+
+    // Anuluj ewentualna finalizacje nagrania i poczekaj na watek,
+    // zeby nie kasowac plikow spod ffmpeg.
+    finalize_at_ms_ = 0;
+    pending_video_path_.clear();
+    committed_video_path_.clear();
+    if (capture_thread_.joinable()) {
+        capture_thread_.join();
+    }
+    hit_finalize_scheduled_ = false;
+    recording_ = false;
+
+    store_.ClearAll();
+
+    std::error_code ec;
+    int removed = 0;
+    if (std::filesystem::is_directory(cfg_.video_dir, ec)) {
+        for (const auto& entry : std::filesystem::directory_iterator(cfg_.video_dir, ec)) {
+            std::filesystem::remove_all(entry.path(), ec);
+            ++removed;
+        }
+    }
+    util::Log(util::LogLevel::Info,
+              "Purge done: scores cleared, " + std::to_string(removed) + " video entries removed");
+
+    RefreshLeaderboard();
+}
+
 void App::RefreshLeaderboard() {
-    auto top = store_.GetTopScores(cfg_.leaderboard_size);
-    std::vector<ui::ScoreEntry> entries;
+    auto top = store_.GetTopScores(cfg_.leaderboard_size);    std::vector<ui::ScoreEntry> entries;
     for (const auto& e : top) {
         ui::ScoreEntry ue{};
         ue.player_id = e.player_id;

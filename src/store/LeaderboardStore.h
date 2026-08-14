@@ -23,6 +23,8 @@ public:
     std::vector<ScoreEntry> GetTopScores(int limit);
     std::vector<ScoreEntry> GetUnsynced(int limit);
     bool MarkSynced(int id);
+    // Serwis: kasuje wszystkie rekordy rankingu.
+    bool ClearAll();
 
 private:
     void EnsureSchema();
