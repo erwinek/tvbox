@@ -73,12 +73,15 @@ int RenderHeader(ui::Renderer& renderer) {
     renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, title_y, false, 255, 1.0f,
                       shadow);
 
-    const std::string ver = tvbox::VersionString();
+    const std::string ver = TVBOX_VERSION;
+    constexpr float kVerScale = 0.42f;
     SDL_Point vw = renderer.MeasureText(ver, ui::FontSize::Small);
-    const int ver_x = w - vw.x - lay.PW(0.02f);
-    const int ver_y = (bar_h - accent_h - vw.y) / 2;
-    renderer.DrawText(ver, ui::FontSize::Small, SDL_Color{160, 170, 200, 220}, ver_x, ver_y, false,
-                      220, 1.0f, 1);
+    const int ver_w = static_cast<int>(vw.x * kVerScale);
+    const int ver_h = static_cast<int>(vw.y * kVerScale);
+    const int ver_x = w - ver_w - lay.PW(0.012f);
+    const int ver_y = std::max(2, (bar_h - accent_h - ver_h) / 2);
+    renderer.DrawText(ver, ui::FontSize::Small, SDL_Color{110, 118, 140, 255}, ver_x, ver_y, false,
+                      70, kVerScale, 0);
     return bar_h;
 }
 

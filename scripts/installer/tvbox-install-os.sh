@@ -129,8 +129,17 @@ chown -R 1000:1000 "$TARGET/home/boxer/tvbox/data" 2>/dev/null || true
 
 if [[ -d "${INSTALL_ROOT}/payload/app/bin" ]]; then
   log "Kopiuje payload/app -> data/app/current"
-  mkdir -p "$TARGET/home/boxer/tvbox/data/app/current"
+  mkdir -p "$TARGET/home/boxer/tvbox/data/app/current" "$TARGET/home/boxer/tvbox/bin"
   rsync -a "${INSTALL_ROOT}/payload/app"/ "$TARGET/home/boxer/tvbox/data/app/current"/
+  if [[ -x "$TARGET/home/boxer/tvbox/data/app/current/bin/tvbox_gui" ]]; then
+    cp -a "$TARGET/home/boxer/tvbox/data/app/current/bin/tvbox_gui" \
+      "$TARGET/home/boxer/tvbox/bin/tvbox_gui"
+  fi
+  if [[ -f "$TARGET/home/boxer/tvbox/data/app/current/bin/tvbox-kiosk-run.sh" ]]; then
+    cp -a "$TARGET/home/boxer/tvbox/data/app/current/bin/tvbox-kiosk-run.sh" \
+      "$TARGET/home/boxer/tvbox/bin/tvbox-kiosk-run.sh"
+    chmod +x "$TARGET/home/boxer/tvbox/bin/tvbox-kiosk-run.sh"
+  fi
 fi
 
 if [[ -f "$TARGET/etc/default/grub" ]]; then

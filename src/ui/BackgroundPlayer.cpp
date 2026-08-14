@@ -26,11 +26,11 @@ namespace ui {
 
 namespace {
 
-// Male okienko — bardzo niska rozdzielczosc + 10 fps (Wyse: unikac 100% CPU).
 constexpr int kDecodeW = 240;
 constexpr int kDecodeH = 426;
-constexpr int kDecodeFps = 10;
-constexpr int kBytesPerPixel = 3;  // rgb24
+constexpr int kDecodeFps = 8;
+constexpr int kMaxFrames = 48;
+constexpr int kBytesPerPixel = 3;
 
 std::string NullDevice() {
 #ifdef _WIN32
@@ -79,7 +79,6 @@ void BackgroundPlayer::Init(const std::string& background_dir) {
             clips_.push_back(entry.path().string());
         }
     }
-    // Preferuj najmniejszy plik (low-res loop) — dekodowanie HD zjada CPU na Wyse.
     std::sort(clips_.begin(), clips_.end(), [](const std::string& a, const std::string& b) {
         std::error_code eca, ecb;
         const auto sa = std::filesystem::file_size(a, eca);
@@ -98,162 +97,78 @@ void BackgroundPlayer::Init(const std::string& background_dir) {
         return;
     }
 
-    util::Log(util::LogLevel::Info,
-              "BackgroundPlayer: " + std::to_string(clips_.size()) +
-                  " klip(ow) (lazy start) w " + background_dir);
-    clip_index_ = 0;
-    // Nie startujemy ffmpeg tutaj — dopiero SetPlaying(true) na ekranie Press Start.
+    Preload(clips_.front());
+}
+
+void BackgroundPlayer::Preload(const std::string& path) {
+    frame_w_ = kDecodeW;
+    frame_h_ = kDecodeH;
+    play_fps_ = kDecodeFps;
+    const std::size_t frame_bytes =
+        static_cast<std::size_t>(frame_w_) * static_cast<std::size_t>(frame_h_) * kBytesPerPixel;
+
+    std::ostringstream cmd;
+    cmd << "ffmpeg -hide_banner -loglevel error -nostdin -threads 1 -filter_threads 1"
+        << " -i \"" << path << "\""
+        << " -an -vf \"fps=" << kDecodeFps << ",scale=" << frame_w_ << ":" << frame_h_
+        << ":flags=fast_bilinear:force_original_aspect_ratio=increase,crop=" << frame_w_ << ":"
+        << frame_h_ << "\""
+        << " -frames:v " << kMaxFrames << " -f rawvideo -pix_fmt rgb24 -"
+        << " 2>" << NullDevice();
+
+    FILE* pipe = TVBOX_POPEN(cmd.str().c_str(), TVBOX_POPEN_MODE);
+    if (!pipe) {
+        util::Log(util::LogLevel::Warn, "BackgroundPlayer: preload ffmpeg failed dla " + path);
+        return;
+    }
+
+    while (static_cast<int>(frames_.size()) < kMaxFrames) {
+        std::vector<std::uint8_t> buf(frame_bytes);
+        std::size_t got = 0;
+        while (got < frame_bytes) {
+            const std::size_t n = fread(buf.data() + got, 1, frame_bytes - got, pipe);
+            if (n == 0) {
+                break;
+            }
+            got += n;
+        }
+        if (got < frame_bytes) {
+            break;
+        }
+        frames_.push_back(std::move(buf));
+    }
+    TVBOX_PCLOSE(pipe);
+
+    util::Log(util::LogLevel::Info, "BackgroundPlayer: preload " + std::to_string(frames_.size()) +
+                                        " klatek z " + path + " (ffmpeg off)");
 }
 
 void BackgroundPlayer::Shutdown() {
-    SetPlaying(false);
+    playing_ = false;
+    frames_.clear();
     clips_.clear();
-    clip_index_ = 0;
-    {
-        std::lock_guard<std::mutex> lock(frame_mutex_);
-        latest_frame_.clear();
-        frame_ready_ = false;
-    }
     if (texture_) {
         SDL_DestroyTexture(texture_);
         texture_ = nullptr;
         tex_w_ = 0;
         tex_h_ = 0;
+        tex_index_ = -1;
     }
 }
 
 void BackgroundPlayer::SetPlaying(bool playing) {
-    if (playing == playing_) {
-        return;
-    }
-    playing_ = playing;
-    if (!playing_) {
-        StopClip();
-        return;
-    }
-    if (clips_.empty()) {
-        playing_ = false;
-        return;
-    }
-    StartClip(clips_[clip_index_]);
-}
-
-bool BackgroundPlayer::StartClip(const std::string& path) {
-    StopClip();
-
-    frame_w_ = kDecodeW;
-    frame_h_ = kDecodeH;
-    const std::size_t frame_bytes =
-        static_cast<std::size_t>(frame_w_) * static_cast<std::size_t>(frame_h_) * kBytesPerPixel;
-
-    {
-        std::lock_guard<std::mutex> lock(frame_mutex_);
-        latest_frame_.assign(frame_bytes, 0);
-        frame_ready_ = false;
-    }
-
-    // -re + 1 watek + fast scale: zrodlo powinno byc juz low-res (patrz assets).
-    std::ostringstream cmd;
-    cmd << "ffmpeg -hide_banner -loglevel error -nostdin -threads 1 -filter_threads 1"
-        << " -re -stream_loop -1 -i \"" << path << "\""
-        << " -an -vf \"fps=" << kDecodeFps
-        << ",scale=" << frame_w_ << ":" << frame_h_
-        << ":flags=fast_bilinear:force_original_aspect_ratio=increase,crop=" << frame_w_ << ":"
-        << frame_h_ << "\""
-        << " -f rawvideo -pix_fmt rgb24 -"
-        << " 2>" << NullDevice();
-
-    pipe_ = TVBOX_POPEN(cmd.str().c_str(), TVBOX_POPEN_MODE);
-    if (!pipe_) {
-        util::Log(util::LogLevel::Warn, "BackgroundPlayer: nie udalo sie uruchomic ffmpeg dla " + path);
-        return false;
-    }
-
-    stop_ = false;
-    clip_ended_ = false;
-    reader_thread_ = std::thread([this]() { ReaderLoop(); });
-    util::Log(util::LogLevel::Info, "BackgroundPlayer: odtwarzam " + path);
-    return true;
-}
-
-void BackgroundPlayer::StopClip() {
-    stop_ = true;
-    if (reader_thread_.joinable()) {
-        reader_thread_.join();
-    }
-    if (pipe_) {
-        TVBOX_PCLOSE(pipe_);
-        pipe_ = nullptr;
-    }
-    clip_ended_ = false;
-}
-
-void BackgroundPlayer::AdvanceClip() {
-    if (clips_.empty() || !playing_) {
-        return;
-    }
-    clip_index_ = (clip_index_ + 1) % clips_.size();
-    StartClip(clips_[clip_index_]);
-}
-
-void BackgroundPlayer::ReaderLoop() {
-    const std::size_t frame_bytes =
-        static_cast<std::size_t>(frame_w_) * static_cast<std::size_t>(frame_h_) * kBytesPerPixel;
-    std::vector<std::uint8_t> buffer(frame_bytes);
-
-    while (!stop_.load()) {
-        if (!pipe_) {
-            break;
-        }
-        std::size_t got = 0;
-        while (got < frame_bytes && !stop_.load()) {
-            const std::size_t n = fread(buffer.data() + got, 1, frame_bytes - got, pipe_);
-            if (n == 0) {
-                clip_ended_ = true;
-                return;
-            }
-            got += n;
-        }
-        if (got < frame_bytes) {
-            clip_ended_ = true;
-            return;
-        }
-
-        std::lock_guard<std::mutex> lock(frame_mutex_);
-        latest_frame_.swap(buffer);
-        if (buffer.size() != frame_bytes) {
-            buffer.assign(frame_bytes, 0);
-        }
-        frame_ready_ = true;
-    }
+    playing_ = playing && !frames_.empty();
 }
 
 bool BackgroundPlayer::Render(Renderer& renderer, const SDL_Rect& dst) {
-    if (!playing_ || clips_.empty()) {
+    if (frames_.empty() || frame_w_ <= 0 || frame_h_ <= 0) {
         return false;
     }
 
-    if (clip_ended_.load() && !stop_.load()) {
-        AdvanceClip();
-    }
-
-    if (!pipe_ && !reader_thread_.joinable() && !clips_.empty()) {
-        StartClip(clips_[clip_index_]);
-    }
-
-    std::vector<std::uint8_t> frame;
-    int fw = 0;
-    int fh = 0;
-    bool have_new = false;
-    {
-        std::lock_guard<std::mutex> lock(frame_mutex_);
-        if (frame_ready_ && !latest_frame_.empty()) {
-            frame = latest_frame_;
-            fw = frame_w_;
-            fh = frame_h_;
-            frame_ready_ = false;
-            have_new = true;
-        }
+    int idx = 0;
+    if (playing_ && play_fps_ > 0) {
+        idx = static_cast<int>((renderer.ticks() / (1000 / static_cast<Uint32>(play_fps_))) %
+                               static_cast<Uint32>(frames_.size()));
     }
 
     SDL_Renderer* sdl = renderer.sdl();
@@ -261,30 +176,28 @@ bool BackgroundPlayer::Render(Renderer& renderer, const SDL_Rect& dst) {
         return false;
     }
 
-    if (have_new) {
-        if (fw <= 0 || fh <= 0) {
+    if (!texture_ || tex_w_ != frame_w_ || tex_h_ != frame_h_) {
+        if (texture_) {
+            SDL_DestroyTexture(texture_);
+            texture_ = nullptr;
+        }
+        texture_ = SDL_CreateTexture(sdl, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
+                                     frame_w_, frame_h_);
+        if (!texture_) {
+            util::Log(util::LogLevel::Warn, "BackgroundPlayer: SDL_CreateTexture failed");
             return false;
         }
-        if (!texture_ || tex_w_ != fw || tex_h_ != fh) {
-            if (texture_) {
-                SDL_DestroyTexture(texture_);
-                texture_ = nullptr;
-            }
-            texture_ = SDL_CreateTexture(sdl, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, fw, fh);
-            if (!texture_) {
-                util::Log(util::LogLevel::Warn, "BackgroundPlayer: SDL_CreateTexture failed");
-                return false;
-            }
-            tex_w_ = fw;
-            tex_h_ = fh;
-        }
-        if (SDL_UpdateTexture(texture_, nullptr, frame.data(), fw * kBytesPerPixel) != 0) {
-            return false;
-        }
+        tex_w_ = frame_w_;
+        tex_h_ = frame_h_;
+        tex_index_ = -1;
     }
 
-    if (!texture_) {
-        return false;
+    if (idx != tex_index_) {
+        const auto& frame = frames_[static_cast<std::size_t>(idx)];
+        if (SDL_UpdateTexture(texture_, nullptr, frame.data(), frame_w_ * kBytesPerPixel) != 0) {
+            return false;
+        }
+        tex_index_ = idx;
     }
 
     renderer.DrawTexture(texture_, dst);

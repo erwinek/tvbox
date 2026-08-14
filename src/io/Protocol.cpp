@@ -9,6 +9,15 @@ namespace io {
 
 namespace {
 
+std::string TrimCopy(std::string s) {
+    const auto start = s.find_first_not_of(" \t\r");
+    if (start == std::string::npos) {
+        return "";
+    }
+    const auto end = s.find_last_not_of(" \t\r");
+    return s.substr(start, end - start + 1);
+}
+
 std::vector<std::string> SplitCsv(const std::string& line) {
     std::vector<std::string> parts;
     std::stringstream ss(line);
@@ -21,7 +30,8 @@ std::vector<std::string> SplitCsv(const std::string& line) {
 
 }  // namespace
 
-std::optional<core::InputEvent> ParseLine(const std::string& line) {
+std::optional<core::InputEvent> ParseLine(const std::string& raw) {
+    const std::string line = TrimCopy(raw);
     if (line.empty()) {
         return std::nullopt;
     }

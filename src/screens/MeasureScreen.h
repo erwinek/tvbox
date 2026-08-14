@@ -44,6 +44,7 @@ private:
     bool counting_ = false;
     bool committed_ = false;
     bool impact_seen_ = false;
+    bool got_pgm_score_ = false;
     int display_score_ = 0;
     int target_score_ = 0;
     int last_fx_score_ = -1;
@@ -51,6 +52,7 @@ private:
     double hold_ms_ = 0.0;
     double idle_ms_ = 0.0;
     double fx_ms_ = 0.0;
+    double score_tick_ms_ = 0.0;
 
     static constexpr int kMaxParticles = 96;
     static constexpr int kMaxWaves = 6;
@@ -59,10 +61,10 @@ private:
     int particle_cursor_ = 0;
     int wave_cursor_ = 0;
 
-    // Po ostatnim SCORE z PGM (koniec Naliczanie) krotki hold → EndGame.
-    // Idle Attract usuniety — resync robi STATE heartbeat z PGM.
-    static constexpr double kQuietMs = 280.0;
-    static constexpr double kHoldMs = 350.0;
+    // Po dogonieniu targetu krotki hold → EndGame.
+    static constexpr double kQuietMs = 220.0;
+    static constexpr double kHoldMs = 400.0;
+    static constexpr double kScoreTickMs = 22.0;
 };
 
 }  // namespace screens

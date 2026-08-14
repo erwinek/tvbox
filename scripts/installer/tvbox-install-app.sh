@@ -19,8 +19,23 @@ lsblk "$INTERNAL"
 
 # Aktywuj LVM jesli OS juz zainstalowany
 vgchange -ay 2>/dev/null || true
-DATA_LV="/dev/ubuntu-vg/tvbox-data"
-ROOT_LV="/dev/ubuntu-vg/ubuntu-lv"
+# Klon uzywa tvbox-vg; ubuntu-vg na USB to sam installer — nie ruszac.
+DATA_LV=""
+ROOT_LV=""
+BOOT_SRC="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+BOOT_SRC="$(readlink -f "$BOOT_SRC" 2>/dev/null || echo "$BOOT_SRC")"
+for vg in tvbox-vg ubuntu-vg; do
+  if [[ -z "$DATA_LV" && -b "/dev/${vg}/tvbox-data" ]]; then
+    DATA_LV="/dev/${vg}/tvbox-data"
+  fi
+  if [[ -b "/dev/${vg}/ubuntu-lv" ]]; then
+    lv_src="$(readlink -f "/dev/${vg}/ubuntu-lv" 2>/dev/null || true)"
+    if [[ -n "$BOOT_SRC" && -n "$lv_src" && "$lv_src" == "$BOOT_SRC" ]]; then
+      continue
+    fi
+    ROOT_LV="/dev/${vg}/ubuntu-lv"
+  fi
+done
 
 MNT="/mnt/wyse-target"
 rm -rf "$MNT"
@@ -63,13 +78,18 @@ if findmnt -n "$MNT" | grep -q ubuntu--lv; then
     cat >/mnt/wyse-root/home/boxer/tvbox/bin/tvbox-kiosk-run.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-APP=/home/boxer/tvbox/data/app/current
-cd "$APP"
+APP_ROOT="/home/boxer/tvbox/data/app/current"
+if [[ ! -x "$APP_ROOT/bin/tvbox_gui" ]]; then
+  APP_ROOT="/home/boxer/tvbox"
+fi
+cd "$APP_ROOT"
 export SDL_VIDEODRIVER=wayland
 mkdir -p /home/boxer/tvbox/data
 exec >>/home/boxer/tvbox/data/tvbox.log 2>&1
-echo "=== start $(date -Is) ==="
-./bin/tvbox_gui ./config/app-wyse.yaml || true
+echo "=== start $(date -Is) APP_ROOT=$APP_ROOT WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} ==="
+CFG=./config/app-wyse.yaml
+[[ -f "$CFG" ]] || CFG=/home/boxer/tvbox/config/app-wyse.yaml
+./bin/tvbox_gui "$CFG" || true
 echo "=== exit $? $(date -Is) ==="
 swaymsg exit 2>/dev/null || true
 EOF

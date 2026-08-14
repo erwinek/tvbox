@@ -388,11 +388,12 @@ bool VideoCapture::FinalizeRingBuffer(const std::string& output_path) {
         return false;
     }
 
-    const std::string temp_ts = output_path + ".tmp.ts";
+    const bool mjpeg = command_template_.find("-f mjpeg") != std::string::npos;
+    const std::string temp_in = output_path + (mjpeg ? ".tmp.mjpg" : ".tmp.ts");
     {
-        std::ofstream out(temp_ts, std::ios::binary);
+        std::ofstream out(temp_in, std::ios::binary);
         if (!out.is_open()) {
-            util::Log(util::LogLevel::Warn, "VideoCapture: cannot write temp ts " + temp_ts);
+            util::Log(util::LogLevel::Warn, "VideoCapture: cannot write temp " + temp_in);
             return false;
         }
         for (const auto& chunk : snapshot) {
@@ -402,12 +403,15 @@ bool VideoCapture::FinalizeRingBuffer(const std::string& output_path) {
     }
 
     const std::string null_dev = NullDevice();
-    const std::string remux_cmd =
-        "ffmpeg -y -i \"" + temp_ts + "\" -c copy \"" + output_path + "\" 2>" + null_dev;
+    const std::string remux_cmd = mjpeg
+        ? "ffmpeg -y -f mjpeg -i \"" + temp_in +
+              "\" -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p \"" + output_path + "\" 2>" +
+              null_dev
+        : "ffmpeg -y -i \"" + temp_in + "\" -c copy \"" + output_path + "\" 2>" + null_dev;
     util::Log(util::LogLevel::Info, "VideoCapture: " + remux_cmd);
     const int result = std::system(remux_cmd.c_str());
     std::error_code ec;
-    std::filesystem::remove(temp_ts, ec);
+    std::filesystem::remove(temp_in, ec);
 
     // Nieudany remux zostawia pusty/uszkodzony plik — usun, zeby UI nie widzialo go jako klipu.
     const bool empty_output =

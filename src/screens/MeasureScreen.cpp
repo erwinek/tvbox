@@ -4,6 +4,7 @@
 #include "game/GameSession.h"
 #include "game/ScoreEngine.h"
 #include "media/AudioPlayer.h"
+#include "ui/BackgroundPlayer.h"
 #include "ui/Renderer.h"
 #include "ui/widgets/Header.h"
 #include "ui/widgets/Hud.h"
@@ -107,12 +108,19 @@ void MeasureScreen::OnEnter(core::AppContext& ctx) {
     counting_ = false;
     committed_ = false;
     impact_seen_ = false;
+    got_pgm_score_ = false;
     display_score_ = 0;
     target_score_ = 0;
     quiet_ms_ = 0.0;
     hold_ms_ = 0.0;
     idle_ms_ = 0.0;
     ResetFx();
+    score_tick_ms_ = 0.0;
+
+    // PGM czesto pomija ModeSelect (START -> Measure) — petla musi grac tu, przed ciosem.
+    if (ctx.background) {
+        ctx.background->SetPlaying(true);
+    }
 
     if (ctx.start_measure_recording) {
         ctx.start_measure_recording();
@@ -120,6 +128,9 @@ void MeasureScreen::OnEnter(core::AppContext& ctx) {
 }
 
 void MeasureScreen::OnExit(core::AppContext& ctx) {
+    if (ctx.background) {
+        ctx.background->SetPlaying(false);
+    }
     if (ctx.cancel_measure_recording) {
         ctx.cancel_measure_recording();
     }
@@ -131,14 +142,25 @@ std::optional<core::GameState> MeasureScreen::HandleEvent(const core::InputEvent
         return std::nullopt;
     }
 
-    // HIT z PGM: zamknij kamere od razu (przed strobo/naliczaniem).
+    // HIT z PGM: od razu UI naliczania (nie czekaj na SCORE — UART bywa gubiony).
     if (event.text == "impact") {
         impact_seen_ = true;
+        if (ctx.background) {
+            ctx.background->SetPlaying(false);
+        }
         if (ctx.freeze_measure_recording) {
             ctx.freeze_measure_recording();
         }
         const ui::Layout& lay = ctx.renderer->layout();
-        fx_ms_ = 0.0;
+        if (!counting_) {
+            counting_ = true;
+            display_score_ = 0;
+            target_score_ = 0;
+            quiet_ms_ = 0.0;
+            hold_ms_ = 0.0;
+            score_tick_ms_ = 0.0;
+            fx_ms_ = 0.0;
+        }
         SpawnBurst(lay.CenterX(), lay.CenterY(), 24, 1.0f);
         SpawnShockwave();
         if (ctx.audio) {
@@ -150,8 +172,33 @@ std::optional<core::GameState> MeasureScreen::HandleEvent(const core::InputEvent
     // Wartosc z PGM Naliczanie — bez mnoznika (PGM juz ma finalna skale).
     int value = event.value;
     if (value <= 0) {
-        value = game::ScoreEngine::Compute(0, ctx.session->selected_mode());
+        // Symulacja (SPACE / STATE,HIT): brak wyniku z PGM — licz lokalnie.
+        got_pgm_score_ = false;
+        if (!counting_) {
+            counting_ = true;
+            display_score_ = 0;
+            target_score_ = 0;
+            score_tick_ms_ = 0.0;
+            if (ctx.background) {
+                ctx.background->SetPlaying(false);
+            }
+            if (!impact_seen_ && ctx.freeze_measure_recording) {
+                ctx.freeze_measure_recording();
+            }
+            const ui::Layout& lay = ctx.renderer->layout();
+            SpawnBurst(lay.CenterX(), lay.CenterY(), 48, 1.15f);
+            SpawnShockwave();
+            SpawnShockwave();
+            if (!impact_seen_ && ctx.audio) {
+                ctx.audio->PlaySound("hit");
+            }
+        }
+        quiet_ms_ = 0.0;
+        hold_ms_ = 0.0;
+        return std::nullopt;
     }
+
+    got_pgm_score_ = true;
 
     const ui::Layout& lay = ctx.renderer->layout();
     const int cx = lay.CenterX();
@@ -159,12 +206,16 @@ std::optional<core::GameState> MeasureScreen::HandleEvent(const core::InputEvent
 
     if (!counting_) {
         counting_ = true;
+        display_score_ = 0;
+        if (ctx.background) {
+            ctx.background->SetPlaying(false);
+        }
         quiet_ms_ = 0.0;
         hold_ms_ = 0.0;
+        score_tick_ms_ = 0.0;
         if (!impact_seen_) {
             fx_ms_ = 0.0;
         }
-        // Fallback gdy HIT nie doszedl — zamknij bufor przy pierwszym SCORE.
         if (!impact_seen_ && ctx.freeze_measure_recording) {
             ctx.freeze_measure_recording();
         }
@@ -175,7 +226,6 @@ std::optional<core::GameState> MeasureScreen::HandleEvent(const core::InputEvent
             ctx.audio->PlaySound("hit");
         }
     } else if (value > last_fx_score_ + 8) {
-        // Skok wyniku podczas naliczania — mini-burst.
         SpawnBurst(cx, cy, 8, 0.7f);
         if ((value / 80) != (last_fx_score_ / 80)) {
             SpawnShockwave();
@@ -183,7 +233,6 @@ std::optional<core::GameState> MeasureScreen::HandleEvent(const core::InputEvent
     }
     last_fx_score_ = value;
 
-    display_score_ = value;
     if (value > target_score_) {
         target_score_ = value;
     }
@@ -197,6 +246,19 @@ std::optional<core::GameState> MeasureScreen::Update(core::AppContext& ctx, doub
     const ui::Layout& lay = ctx.renderer->layout();
     if (counting_) {
         UpdateFx(dt_ms, lay.CenterX(), lay.CenterY());
+        score_tick_ms_ += dt_ms;
+        while (score_tick_ms_ >= kScoreTickMs && display_score_ < target_score_) {
+            score_tick_ms_ -= kScoreTickMs;
+            if (display_score_ + 33 < target_score_) {
+                display_score_ += 13;
+            } else {
+                display_score_ += 1;
+            }
+            if (display_score_ > target_score_) {
+                display_score_ = target_score_;
+            }
+        }
+        ctx.session->SetScore(std::max(display_score_, target_score_));
     }
 
     if (!counting_) {
@@ -205,12 +267,24 @@ std::optional<core::GameState> MeasureScreen::Update(core::AppContext& ctx, doub
         return std::nullopt;
     }
 
+    // Czekaj na wynik z PGM — bez SCORE nie konczymy (nie commituj 0).
+    if (!got_pgm_score_) {
+        quiet_ms_ = 0.0;
+        hold_ms_ = 0.0;
+        return std::nullopt;
+    }
+
+    if (display_score_ < target_score_) {
+        quiet_ms_ = 0.0;
+        hold_ms_ = 0.0;
+        return std::nullopt;
+    }
+
     quiet_ms_ += dt_ms;
     if (quiet_ms_ < kQuietMs) {
         return std::nullopt;
     }
 
-    // Brak kolejnych SCORE ≈ PGM skonczyl Naliczanie.
     hold_ms_ += dt_ms;
     if (!committed_) {
         committed_ = true;
@@ -340,10 +414,21 @@ void MeasureScreen::Render(core::AppContext& ctx) {
         }
         float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(elapsed) * 0.006f);
         Uint8 alpha = static_cast<Uint8>(140 + static_cast<int>(pulse * 115));
-        r.DrawText(prompt, ui::FontSize::Huge, SDL_Color{255, 90, 90, 255}, cx,
-                   cy - lay.PH(0.09f), true, alpha, 1.0f, 4);
-        r.DrawText("(SPACE = symulacja)", ui::FontSize::Small, SDL_Color{150, 150, 175, 255}, cx,
-                   r.height() - lay.PH(0.083f), true);
+        const int prompt_h = r.MeasureText(prompt, ui::FontSize::Large).y;
+        const int gap = lay.PH(0.018f);
+        const int prompt_y = badge_y + badge.h + gap;
+        const int vid_h = lay.PH(0.42f);
+        const int vid_w = (vid_h * 9) / 16;
+        const int vid_y = prompt_y + prompt_h + gap;
+        const SDL_Rect video{cx - vid_w / 2, vid_y, vid_w, vid_h};
+
+        r.DrawText(prompt, ui::FontSize::Large, SDL_Color{255, 90, 90, 255}, cx, prompt_y, true,
+                   alpha, 1.0f, 3);
+        r.Panel(SDL_Rect{video.x - 4, video.y - 4, video.w + 8, video.h + 8}, lay.PM(0.01f),
+                SDL_Color{0, 0, 0, 180}, SDL_Color{255, 255, 255, 40});
+        if (!(ctx.background && ctx.background->Render(r, video))) {
+            r.FillRect(video, SDL_Color{20, 20, 28, 255});
+        }
     } else {
         const bool finishing = quiet_ms_ >= kQuietMs;
         float scale = finishing ? 1.85f : 1.5f;
