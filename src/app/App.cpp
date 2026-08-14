@@ -6,7 +6,9 @@
 #include "screens/EndGameScreen.h"
 #include "screens/MeasureScreen.h"
 #include "screens/ModeSelectScreen.h"
+#include "screens/SplashScreen.h"
 #include "util/Logger.h"
+#include "version.h"
 
 #include <SDL.h>
 
@@ -45,6 +47,8 @@ App::~App() {
 }
 
 bool App::Init() {
+    util::Log(util::LogLevel::Info,
+              std::string(tvbox::VersionString()) + "  " + tvbox::VersionDetail());
     std::filesystem::create_directories("data");
     std::filesystem::create_directories(cfg_.video_dir);
 
@@ -100,11 +104,12 @@ bool App::Init() {
     }
 
     RefreshLeaderboard();
-    fsm_.Start(core::GameState::Attract, ctx_);
+    fsm_.Start(core::GameState::Splash, ctx_);
     return true;
 }
 
 void App::RegisterScreens() {
+    fsm_.Register(core::GameState::Splash, std::make_unique<screens::SplashScreen>());
     fsm_.Register(core::GameState::Attract, std::make_unique<screens::AttractScreen>());
     fsm_.Register(core::GameState::ModeSelect, std::make_unique<screens::ModeSelectScreen>());
     fsm_.Register(core::GameState::Measure, std::make_unique<screens::MeasureScreen>());

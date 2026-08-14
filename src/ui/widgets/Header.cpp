@@ -1,6 +1,7 @@
 #include "ui/widgets/Header.h"
 
 #include "ui/Renderer.h"
+#include "version.h"
 
 #include <algorithm>
 #include <cmath>
@@ -71,6 +72,13 @@ int RenderHeader(ui::Renderer& renderer) {
                       false, 255, 1.0f, shadow);
     renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, title_y, false, 255, 1.0f,
                       shadow);
+
+    const std::string ver = tvbox::VersionString();
+    SDL_Point vw = renderer.MeasureText(ver, ui::FontSize::Small);
+    const int ver_x = w - vw.x - lay.PW(0.02f);
+    const int ver_y = (bar_h - accent_h - vw.y) / 2;
+    renderer.DrawText(ver, ui::FontSize::Small, SDL_Color{160, 170, 200, 220}, ver_x, ver_y, false,
+                      220, 1.0f, 1);
     return bar_h;
 }
 

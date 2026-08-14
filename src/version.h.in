@@ -1,0 +1,17 @@
+#pragma once
+
+#define TVBOX_VERSION "@TVBOX_VERSION@"
+#define TVBOX_GIT_SHA "@TVBOX_GIT_SHA@"
+#define TVBOX_BUILD_DATE "@TVBOX_BUILD_DATE@"
+
+namespace tvbox {
+
+inline const char* VersionString() {
+    return "TVBOX " TVBOX_VERSION;
+}
+
+inline const char* VersionDetail() {
+    return TVBOX_VERSION "  " TVBOX_GIT_SHA "  " TVBOX_BUILD_DATE;
+}
+
+}  // namespace tvbox

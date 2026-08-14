@@ -1,0 +1,24 @@
+[Unit]
+Description=TVBox USB installer menu
+After=multi-user.target local-fs.target
+Conflicts=getty@tty1.service
+ConditionPathExists=/opt/tvbox-installer/scripts/tvbox-installer-menu.sh
+
+[Service]
+Type=idle
+Environment=TERM=linux
+Environment=NCURSES_NO_UTF8_ACS=1
+WorkingDirectory=/opt/tvbox-installer
+ExecStart=/opt/tvbox-installer/scripts/tvbox-installer-menu.sh
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

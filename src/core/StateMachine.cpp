@@ -6,6 +6,8 @@ namespace core {
 
 const char* ToString(GameState state) {
     switch (state) {
+        case GameState::Splash:
+            return "SPLASH";
         case GameState::Attract:
             return "ATTRACT";
         case GameState::ModeSelect:

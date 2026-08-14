@@ -1,8 +1,22 @@
 cmake_minimum_required(VERSION 3.16)
-project(tvbox_gui LANGUAGES CXX)
+project(tvbox_gui VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(TVBOX_VERSION "${PROJECT_VERSION}")
+set(TVBOX_GIT_SHA "unknown" CACHE STRING "git short sha")
+if(TVBOX_GIT_SHA STREQUAL "unknown")
+    execute_process(
+        COMMAND git -C "${CMAKE_SOURCE_DIR}" rev-parse --short HEAD
+        OUTPUT_VARIABLE TVBOX_GIT_SHA
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif()
+string(TIMESTAMP TVBOX_BUILD_DATE "%Y-%m-%d")
+configure_file("${CMAKE_SOURCE_DIR}/src/version.h.in" "${CMAKE_BINARY_DIR}/generated/version.h" @ONLY)
+message(STATUS "TVBox ${TVBOX_VERSION} (${TVBOX_GIT_SHA} ${TVBOX_BUILD_DATE})")
 
 find_package(Threads REQUIRED)
 
@@ -25,6 +39,7 @@ set(TVBOX_SOURCES
     src/ui/widgets/ScrollBar.cpp
     src/ui/widgets/LeaderboardWidget.cpp
     src/ui/widgets/Hud.cpp
+    src/screens/SplashScreen.cpp
     src/screens/AttractScreen.cpp
     src/screens/ModeSelectScreen.cpp
     src/screens/MeasureScreen.cpp
@@ -40,7 +55,7 @@ set(TVBOX_SOURCES
 )
 
 add_executable(tvbox_gui ${TVBOX_SOURCES})
-target_include_directories(tvbox_gui PRIVATE src)
+target_include_directories(tvbox_gui PRIVATE src "${CMAKE_BINARY_DIR}/generated")
 
 if(WIN32 AND NOT MINGW)
     find_package(SDL2 CONFIG REQUIRED)

@@ -18,3 +18,10 @@ Thumbs.db
 
 # Logi
 *.log
+
+# Local dumps
+/data/ffmpeg_devices.txt
+scripts/installer/_*.sh
+scripts/installer/_*.txt
+scripts/installer/_*.ps1
+scripts/installer/ventoy/
