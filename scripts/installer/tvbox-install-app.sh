@@ -114,6 +114,33 @@ EOF
   umount "$MNT" || true
 fi
 
+# Root FS tez musi dostac nowa binarke + kiosk-run + configi — stare obrazy
+# maja kiosk-run bez data/app/current i inaczej startuja STARA apke mimo update.
+if [[ -n "${ROOT_LV:-}" && -b "$ROOT_LV" ]]; then
+  RROOT=/mnt/wyse-rootfs
+  rm -rf "$RROOT"
+  mkdir -p "$RROOT"
+  mount "$ROOT_LV" "$RROOT" 2>/dev/null || true
+  if findmnt -n "$RROOT" >/dev/null 2>&1; then
+    mkdir -p "$RROOT/home/boxer/tvbox/bin" "$RROOT/home/boxer/tvbox/config"
+    if [[ -x "$SRC/bin/tvbox_gui" ]]; then
+      cp -a "$SRC/bin/tvbox_gui" "$RROOT/home/boxer/tvbox/bin/tvbox_gui"
+      chmod +x "$RROOT/home/boxer/tvbox/bin/tvbox_gui"
+    fi
+    if [[ -f "$SRC/bin/tvbox-kiosk-run.sh" ]]; then
+      cp -a "$SRC/bin/tvbox-kiosk-run.sh" "$RROOT/home/boxer/tvbox/bin/tvbox-kiosk-run.sh"
+      chmod +x "$RROOT/home/boxer/tvbox/bin/tvbox-kiosk-run.sh"
+    fi
+    [[ -f "$SRC/config/sway-kiosk.conf" ]] && \
+      cp -a "$SRC/config/sway-kiosk.conf" "$RROOT/home/boxer/tvbox/config/sway-kiosk.conf"
+    [[ -f "$SRC/config/app-wyse.yaml" ]] && \
+      cp -a "$SRC/config/app-wyse.yaml" "$RROOT/home/boxer/tvbox/config/app-wyse.yaml"
+    chown -R 1000:1000 "$RROOT/home/boxer/tvbox" 2>/dev/null || true
+    umount "$RROOT" || true
+    log "Root FS zaktualizowany: bin/tvbox_gui + kiosk-run + config."
+  fi
+fi
+
 sync
 log "Aplikacja zainstalowana. Wyjmij USB i zbootuj z dysku Wyse (lub restart tvbox)."
 whiptail --msgbox "OK: apka skopiowana na dysk Wyse." 8 50 || true
