@@ -140,6 +140,12 @@ if [[ -d "${INSTALL_ROOT}/payload/app/bin" ]]; then
       "$TARGET/home/boxer/tvbox/bin/tvbox-kiosk-run.sh"
     chmod +x "$TARGET/home/boxer/tvbox/bin/tvbox-kiosk-run.sh"
   fi
+  # Sway config (rotacja ekranu) z payloadu — root.tar.gz moze miec stary transform.
+  if [[ -f "$TARGET/home/boxer/tvbox/data/app/current/config/sway-kiosk.conf" ]]; then
+    mkdir -p "$TARGET/home/boxer/tvbox/config"
+    cp -a "$TARGET/home/boxer/tvbox/data/app/current/config/sway-kiosk.conf" \
+      "$TARGET/home/boxer/tvbox/config/sway-kiosk.conf"
+  fi
 fi
 
 if [[ -f "$TARGET/etc/default/grub" ]]; then
