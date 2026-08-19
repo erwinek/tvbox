@@ -1,0 +1,6 @@
+# udev rule: uruchom tvbox-update-watcher gdy pojawi sie pendrive z LABEL=TVBOX-UPDATE.
+# Instalacja: sudo cp 99-tvbox-update.rules /etc/udev/rules.d/
+#             sudo udevadm control --reload-rules
+
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_LABEL}=="TVBOX-UPDATE", \
+    TAG+="systemd", ENV{SYSTEMD_WANTS}="tvbox-update-watcher.service"

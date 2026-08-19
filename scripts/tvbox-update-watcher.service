@@ -1,0 +1,17 @@
+[Unit]
+Description=TVBox USB Update Watcher
+# Uruchamiany przez udev gdy pojawi sie pendrive z LABEL=TVBOX-UPDATE.
+# Nie startuje automatycznie przy boot — tylko on-demand z udev.
+After=multi-user.target
+StopWhenUnneeded=true
+
+[Service]
+Type=oneshot
+# Uruchom jako root — potrzebne do mount/umount i restart tvbox.service
+User=root
+ExecStart=/home/boxer/tvbox/bin/tvbox-update-watcher.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tvbox-update
+# Nie restartuj automatycznie — udev wywola ponownie przy nastepnym pendrive
+Restart=no
