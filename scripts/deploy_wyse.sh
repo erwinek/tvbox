@@ -57,6 +57,16 @@ cp "$PROJECT_DIR/scripts/tvbox-kiosk-run.sh" "$INSTALL_DIR/bin/tvbox-kiosk-run.s
 chmod +x "$INSTALL_DIR/bin/tvbox-kiosk-run.sh"
 sed -i 's/\r$//' "$INSTALL_DIR/bin/tvbox-kiosk-run.sh" "$INSTALL_DIR/config/sway-kiosk.conf" || true
 [ -f "$PROJECT_DIR/build/drm_rotate_probe" ] && cp "$PROJECT_DIR/build/drm_rotate_probe" "$INSTALL_DIR/bin/"
+
+# Kiosk-run preferuje overlay: data/app/current — tam tez musi trafic nowa binarka.
+APP_CURRENT="$INSTALL_DIR/data/app/current"
+if [[ -d "$APP_CURRENT" || -L "$APP_CURRENT" || -d "$INSTALL_DIR/data" ]]; then
+  mkdir -p "$APP_CURRENT/bin" "$APP_CURRENT/config"
+  cp "$PROJECT_DIR/build/tvbox_gui" "$APP_CURRENT/bin/tvbox_gui"
+  chmod +x "$APP_CURRENT/bin/tvbox_gui"
+  cp "$PROJECT_DIR/config/app-wyse.yaml" "$APP_CURRENT/config/app-wyse.yaml"
+  echo "Installed also -> $APP_CURRENT/bin/tvbox_gui"
+fi
 # Low-res klipy tla (ModeSelect) — bez tego ffmpeg dekoduje stare HD i zjada CPU.
 if [[ -d "$PROJECT_DIR/assets/backgrounds" ]]; then
   mkdir -p "$INSTALL_DIR/assets/backgrounds"

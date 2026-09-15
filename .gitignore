@@ -2,6 +2,7 @@
 /build/
 /build-mingw/
 /out/
+/dist/
 /vcpkg_installed/
 
 # Runtime data (generowane w trakcie pracy aplikacji)

@@ -1,0 +1,9 @@
+[Unit]
+Description=TVBox USB app upgrade (%i)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tvbox-usb-upgrade.sh /dev/%i
+Nice=10
+TimeoutStartSec=120

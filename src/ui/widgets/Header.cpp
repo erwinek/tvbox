@@ -61,17 +61,16 @@ int RenderHeader(ui::Renderer& renderer) {
     SDL_Color accent = AccentColor(elapsed);
     renderer.FillRect(SDL_Rect{0, bar_h - accent_h, w, accent_h}, accent);
 
-    const std::string a = "Boxer ";
+    const std::string a = "Boxer";
     const std::string b = "Video";
     SDL_Point wa = renderer.MeasureText(a, ui::FontSize::Large);
-    SDL_Point wb = renderer.MeasureText(b, ui::FontSize::Large);
-    const int total = wa.x + wb.x;
-    const int start_x = lay.CenterX() - total / 2;
+    const int gap = renderer.MeasureText("     ", ui::FontSize::Large).x;
+    const int left_x = lay.CenterX() - gap / 2 - wa.x;
+    const int right_x = lay.CenterX() + gap / 2;
     const int title_y = (bar_h - accent_h - wa.y) / 2;
-    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, start_x, title_y,
+    renderer.DrawText(a, ui::FontSize::Large, SDL_Color{240, 240, 250, 255}, left_x, title_y,
                       false, 255, 1.0f, shadow);
-    renderer.DrawText(b, ui::FontSize::Large, accent, start_x + wa.x, title_y, false, 255, 1.0f,
-                      shadow);
+    renderer.DrawText(b, ui::FontSize::Large, accent, right_x, title_y, false, 255, 1.0f, shadow);
 
     const std::string ver = TVBOX_VERSION;
     constexpr float kVerScale = 0.42f;

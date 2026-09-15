@@ -289,7 +289,7 @@ void App::FreezeMeasureRecording() {
 void App::ScheduleHitRecordingFinalize(const std::string& video_path) {
     pending_video_path_ = video_path;
     committed_video_path_ = video_path;
-    // Domyslnie 0 — stop zaraz po uderzeniu (HIT), bez dogrywania post-hit.
+    // Dograj camera_post_hit_ms po uderzeniu, potem dump ring buffera.
     finalize_at_ms_ = core::NowMs() + cfg_.camera_post_hit_ms;
     hit_finalize_scheduled_ = true;
     util::Log(util::LogLevel::Info,

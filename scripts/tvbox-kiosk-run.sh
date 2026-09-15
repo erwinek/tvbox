@@ -10,6 +10,12 @@ fi
 cd "$APP_ROOT"
 export SDL_VIDEODRIVER=wayland
 mkdir -p /home/boxer/tvbox/data
+
+# Pendrive TVBOX_UPDATE (RW data LV) — dziala tez gdy udev nie zdazyl.
+if [[ -x /usr/local/sbin/tvbox-usb-upgrade.sh ]]; then
+  /usr/local/sbin/tvbox-usb-upgrade.sh --scan >/dev/null 2>&1 || true
+fi
+
 # Logi do pliku (dziecko sway nie idzie do journal systemd).
 exec >>/home/boxer/tvbox/data/tvbox.log 2>&1
 echo "=== start $(date -Is) APP_ROOT=$APP_ROOT WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} ==="

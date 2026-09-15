@@ -1,0 +1,3 @@
+# Pendrive z folderem TVBOX_UPDATE -> oneshot systemd (zapis na RW data LV).
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{DEVTYPE}=="partition", \
+  TAG+="systemd", ENV{SYSTEMD_WANTS}="tvbox-usb-upgrade@%k.service"

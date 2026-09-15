@@ -15,7 +15,7 @@ SDL_Color AccentColor(Uint32 elapsed_ms);
 // zalezny od orientacji).
 int HeaderHeight(ui::Renderer& renderer);
 
-// Rysuje gorny pasek: tlo, linia akcentu i tytul "Boxer Video".
+// Rysuje gorny pasek: tlo, linia akcentu i tytul "Boxer" | kamera | "Video".
 // Zwraca wysokosc paska, zeby ekrany mogly ukladac tresc pod nim.
 int RenderHeader(ui::Renderer& renderer);
 
