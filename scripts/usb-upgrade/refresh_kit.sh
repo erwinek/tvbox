@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 STAMP="$(date -u -Iseconds)"
-printf 'version=1.1.4\nupdated=%s\n' "$STAMP" | sudo tee /home/boxer/tvbox/data/app/current/VERSION >/dev/null
+printf 'version=1.1.5\nupdated=%s\n' "$STAMP" | sudo tee /home/boxer/tvbox/data/app/current/VERSION >/dev/null
 sudo mkdir -p /home/boxer/tvbox/data/upgrade-kit/TVBOX_UPDATE/bin \
   /home/boxer/tvbox/data/upgrade-kit/TVBOX_UPDATE/config
 sudo cp -a /home/boxer/tvbox/data/app/current/bin/tvbox_gui \
